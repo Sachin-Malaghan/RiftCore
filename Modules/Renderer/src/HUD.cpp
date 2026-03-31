@@ -27,8 +27,13 @@ namespace RiftCore {
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.IniFilename = nullptr;
+        // Do NOT enable keyboard navigation
+        // This allows our game to receive ALL key events
+        // ImGui will only capture keys when a widget is focused
+        io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
+        io.IniFilename  = nullptr;
+        // Tell ImGui not to set OS cursor
+        io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
         RIFTCORE_UNUSED(io);
 
         // Style — dark theme with custom colors
@@ -392,5 +397,6 @@ namespace RiftCore {
     }
 
 } // namespace RiftCore
+
 
 
