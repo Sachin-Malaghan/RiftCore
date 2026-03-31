@@ -39,3 +39,5 @@ Thumbs.db
 
 # vcpkg (not needed in repo)
 vcpkg_installed/
+
+build_output.txt
