@@ -1,40 +1,39 @@
 ﻿#include <Physics/RigidBody.h>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 namespace RiftCore {
 
     RigidBody::RigidBody(u32 id, const RigidBodyDesc& desc)
-        : id_(id)
-        , position_(desc.position)
-        , velocity_(desc.velocity)
+        : id_             (id)
+        , position_       (desc.position)
+        , velocity_       (desc.velocity)
         , angularVelocity_(desc.angularVelocity)
-        , linearDamping_(desc.linearDamping)
-        , angularDamping_(desc.angularDamping)
-        , isStatic_(desc.isStatic)
-        , isKinematic_(desc.isKinematic)
-        , useGravity_(desc.useGravity)
-        , collider_(desc.collider)
+        , linearDamping_  (desc.linearDamping)
+        , angularDamping_ (desc.angularDamping)
+        , isStatic_       (desc.isStatic)
+        , isKinematic_    (desc.isKinematic)
+        , useGravity_     (desc.useGravity)
+        , collider_       (desc.collider)
+        , isAwake_        (true)
     {
         if (isStatic_) {
             mass_    = 0.0f;
             invMass_ = 0.0f;
-            isAwake_ = true;  // static bodies always awake
         } else {
-            mass_    = desc.mass > 0 ? desc.mass : 1.0f;
+            mass_    = (desc.mass > 0) ? desc.mass : 1.0f;
             invMass_ = 1.0f / mass_;
-            isAwake_ = true;
         }
     }
 
     void RigidBody::SetPosition(const Vec3& pos) {
         position_ = pos;
-        Wake();
     }
 
     void RigidBody::SetVelocity(const Vec3& vel) {
         velocity_ = vel;
-        Wake();
+        isAwake_  = true;
     }
 
     void RigidBody::SetAngularVelocity(const Vec3& av) {
@@ -46,7 +45,7 @@ namespace RiftCore {
         accumulatedForce_.x += force.x;
         accumulatedForce_.y += force.y;
         accumulatedForce_.z += force.z;
-        Wake();
+        isAwake_ = true;
     }
 
     void RigidBody::ApplyImpulse(const Vec3& impulse) {
@@ -54,7 +53,7 @@ namespace RiftCore {
         velocity_.x += impulse.x * invMass_;
         velocity_.y += impulse.y * invMass_;
         velocity_.z += impulse.z * invMass_;
-        Wake();
+        isAwake_ = true;
     }
 
     void RigidBody::ApplyTorque(const Vec3& torque) {
@@ -65,117 +64,114 @@ namespace RiftCore {
     }
 
     void RigidBody::ClearForces() {
-        accumulatedForce_  = Vec3::Zero();
-        accumulatedTorque_ = Vec3::Zero();
+        accumulatedForce_   = Vec3::Zero();
+        accumulatedTorque_  = Vec3::Zero();
     }
 
     void RigidBody::Integrate(f32 dt, const Vec3& gravity) {
         if (isStatic_ || isKinematic_ || !isAwake_) return;
 
-        // Apply gravity
+        // Apply gravity force
         if (useGravity_) {
             accumulatedForce_.x += gravity.x * mass_;
             accumulatedForce_.y += gravity.y * mass_;
             accumulatedForce_.z += gravity.z * mass_;
         }
 
-        // Linear acceleration = F / m
-        Vec3 acceleration = {
+        // Compute acceleration
+        Vec3 accel = {
             accumulatedForce_.x * invMass_,
             accumulatedForce_.y * invMass_,
             accumulatedForce_.z * invMass_
         };
 
         // Semi-implicit Euler
-        velocity_.x += acceleration.x * dt;
-        velocity_.y += acceleration.y * dt;
-        velocity_.z += acceleration.z * dt;
+        velocity_.x += accel.x * dt;
+        velocity_.y += accel.y * dt;
+        velocity_.z += accel.z * dt;
 
-        // ── CCD velocity clamping ─────────────────────────
-        // Limit max velocity per frame to prevent tunneling
-        // Max distance per step = half of smallest collider
-        // For radius 0.5 sphere: max = 0.5 / dt
-        const f32 maxVelPerStep = 20.0f;
-        f32 speedSq =
+        // Velocity cap to prevent tunneling
+        const f32 maxSpeed = 30.0f;
+        f32 speed = std::sqrt(
             velocity_.x * velocity_.x +
             velocity_.y * velocity_.y +
-            velocity_.z * velocity_.z;
-        if (speedSq > maxVelPerStep * maxVelPerStep) {
-            f32 speed    = std::sqrt(speedSq);
-            f32 scale    = maxVelPerStep / speed;
-            velocity_.x *= scale;
-            velocity_.y *= scale;
-            velocity_.z *= scale;
+            velocity_.z * velocity_.z);
+        if (speed > maxSpeed) {
+            f32 s    = maxSpeed / speed;
+            velocity_.x *= s;
+            velocity_.y *= s;
+            velocity_.z *= s;
         }
 
-        // Apply linear damping
-        f32 linDamp = 1.0f - linearDamping_ * dt;
-        if (linDamp < 0.0f) linDamp = 0.0f;
-        velocity_.x *= linDamp;
-        velocity_.y *= linDamp;
-        velocity_.z *= linDamp;
+        // Linear damping
+        f32 ld = std::max(0.0f, 1.0f - linearDamping_ * dt);
+        velocity_.x *= ld;
+        velocity_.y *= ld;
+        velocity_.z *= ld;
 
-        // Update position
+        // Integrate position
         position_.x += velocity_.x * dt;
         position_.y += velocity_.y * dt;
         position_.z += velocity_.z * dt;
 
-        // Angular velocity from torque
-        angularVelocity_.x += accumulatedTorque_.x
-                               * invMass_ * dt;
-        angularVelocity_.y += accumulatedTorque_.y
-                               * invMass_ * dt;
-        angularVelocity_.z += accumulatedTorque_.z
-                               * invMass_ * dt;
+        // Angular velocity from torque (simplified)
+        angularVelocity_.x +=
+            accumulatedTorque_.x * invMass_ * dt;
+        angularVelocity_.y +=
+            accumulatedTorque_.y * invMass_ * dt;
+        angularVelocity_.z +=
+            accumulatedTorque_.z * invMass_ * dt;
 
-        // Clamp angular velocity to prevent spinning chaos
-        const f32 maxAngVel = 15.0f;
-        f32 angSpeedSq =
+        // Angular speed cap
+        const f32 maxAngSpeed = 10.0f;
+        f32 angSpeed = std::sqrt(
             angularVelocity_.x * angularVelocity_.x +
             angularVelocity_.y * angularVelocity_.y +
-            angularVelocity_.z * angularVelocity_.z;
-        if (angSpeedSq > maxAngVel * maxAngVel) {
-            f32 angSpeed = std::sqrt(angSpeedSq);
-            f32 s        = maxAngVel / angSpeed;
+            angularVelocity_.z * angularVelocity_.z);
+        if (angSpeed > maxAngSpeed) {
+            f32 s = maxAngSpeed / angSpeed;
             angularVelocity_.x *= s;
             angularVelocity_.y *= s;
             angularVelocity_.z *= s;
         }
 
-        // Apply angular damping
-        f32 angDamp = 1.0f - angularDamping_ * dt;
-        if (angDamp < 0.0f) angDamp = 0.0f;
-        angularVelocity_.x *= angDamp;
-        angularVelocity_.y *= angDamp;
-        angularVelocity_.z *= angDamp;
+        // Angular damping
+        f32 ad = std::max(0.0f, 1.0f - angularDamping_ * dt);
+        angularVelocity_.x *= ad;
+        angularVelocity_.y *= ad;
+        angularVelocity_.z *= ad;
 
-        // Update rotation
+        // Integrate rotation
         rotation_.x += angularVelocity_.x * dt;
         rotation_.y += angularVelocity_.y * dt;
         rotation_.z += angularVelocity_.z * dt;
 
         ClearForces();
 
-        // Sleep check - use speed squared
-        if (speedSq < sleepThreshold_ * sleepThreshold_) {
+        // Sleep check
+        f32 kineticEnergy =
+            velocity_.x * velocity_.x +
+            velocity_.y * velocity_.y +
+            velocity_.z * velocity_.z;
+
+        if (kineticEnergy < 0.01f) {
             sleepTimer_ += dt;
-            if (sleepTimer_ >= sleepDelay_) {
-                // Only sleep if really not moving
+            if (sleepTimer_ > 2.0f) {
                 velocity_        = Vec3::Zero();
                 angularVelocity_ = Vec3::Zero();
-                Sleep();
+                isAwake_         = false;
             }
         } else {
-            sleepTimer_ = 0;
+            sleepTimer_ = 0.0f;
         }
     }
 
     AABB RigidBody::GetAABB() const {
         AABB aabb;
-        const auto& col = collider_;
+        const ColliderDesc& col = collider_;
 
         if (col.shape == ColliderShape::Sphere) {
-            f32 r = col.radius;
+            f32 r    = col.radius;
             aabb.min = {
                 position_.x - r,
                 position_.y - r,
@@ -200,18 +196,14 @@ namespace RiftCore {
             };
         }
         else if (col.shape == ColliderShape::Plane) {
-            // Plane AABB: infinite in XZ, extends upward
-            // planeOffset = Y position of plane
-            f32 planeY = col.planeOffset;
-            aabb.min = {-500.0f, planeY - 0.1f, -500.0f};
-            aabb.max = { 500.0f, planeY + 500.0f, 500.0f};
+            // Plane at planeOffset along planeNormal
+            // Give it a large AABB above the plane
+            f32 y    = col.planeOffset;
+            aabb.min = {-1000.0f, y - 1.0f, -1000.0f};
+            aabb.max = { 1000.0f, y + 1000.0f,  1000.0f};
         }
+
         return aabb;
     }
 
 } // namespace RiftCore
-
-
-
-
-

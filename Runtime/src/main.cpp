@@ -11,16 +11,15 @@
 #include <Renderer/TextureLoader.h>
 #include <Renderer/HUD.h>
 #include <Physics/PhysicsWorld.h>
+#include <Scene/SceneSystem.h>
 
 #include <iostream>
 #include <cmath>
 #include <string>
 #include <vector>
-#include <random>
 
 using namespace RiftCore;
 
-// One-shot key press detector
 struct KeyTracker {
     bool wasDown = false;
     bool Pressed(bool isDown) {
@@ -30,22 +29,11 @@ struct KeyTracker {
     }
 };
 
-struct PhysicsObject {
-    std::string  name;
-    u32          bodyID    = 0;
-    GPUMesh*     mesh      = nullptr;
-    MaterialData material;
-    Vec3         scale     = {1,1,1};
-    bool         isStatic  = false;
-    bool         isGround  = false;   // skip rendering
-    bool         isPlatform= false;   // render differently
-};
-
 int main()
 {
     Engine engine;
     EngineConfig config;
-    config.appName     = "RiftCore Physics Demo";
+    config.appName     = "RiftCore Scene System Demo";
     config.logFilePath = "RiftCore.log";
     config.logLevel    = LogLevel::Info;
     if (engine.Initialize(config).IsErr()) return -1;
@@ -55,7 +43,7 @@ int main()
     ModuleInitParams params;
     params.context = engine.GetContext();
 
-    // ── Modules ───────────────────────────────────────────
+    // ── Load all modules ──────────────────────────────────
     plugins->LoadAndInit("OpenGLBackend",
         "RiftCore_OpenGLBackend.dll", params);
     auto* rhi    = engine.GetContext()->RHI();
@@ -79,19 +67,27 @@ int main()
         return -1;
     auto* texLoader = renderer->GetTextureLoader();
 
-    // Physics
-    auto physResult = plugins->LoadAndInit(
-        "Physics","RiftCore_Physics.dll",params);
-    if (physResult.IsErr()) {
-        logger->Error("Main","Physics failed: " +
-            physResult.Error().message);
-        return -1;
-    }
+    plugins->LoadAndInit("Physics",
+        "RiftCore_Physics.dll", params);
     auto* physMod = plugins->GetModuleAs
         <PhysicsModule>("Physics");
     auto* physics  = physMod->GetPhysics();
-    logger->Info("Main","Physics loaded OK");
 
+    // ── Load Scene DLL ────────────────────────────────────
+    logger->Info("Main","Loading Scene module...");
+    auto sceneResult = plugins->LoadAndInit(
+        "Scene","RiftCore_Scene.dll",params);
+    if (sceneResult.IsErr()) {
+        logger->Error("Main",
+            "Scene failed: " + sceneResult.Error().message);
+        return -1;
+    }
+    auto* sceneMod = plugins->GetModuleAs
+        <SceneModule>("Scene");
+    auto* scene = sceneMod->GetSceneSystem();
+    logger->Info("Main","Scene module loaded OK");
+
+    // ── HUD ───────────────────────────────────────────────
     HUD hud;
     hud.Initialize(device->GetWindow());
 
@@ -113,147 +109,85 @@ int main()
         "blue",80,100,220).Value();
     auto* goldTex   = texLoader->CreateSolidColor(
         "gold",220,180,50).Value();
-    auto* greenTex  = texLoader->CreateSolidColor(
-        "green",80,200,80).Value();
     auto* grayTex   = texLoader->CreateSolidColor(
         "gray",160,160,160).Value();
-    auto* cyanTex   = texLoader->CreateSolidColor(
-        "cyan",80,200,200).Value();
 
     auto makeMat = [](Texture2D* tex,
-                      f32 met=0.0f, f32 rou=0.6f) {
+                      f32 met=0.0f, f32 rou=0.5f) {
         MaterialData m;
-        m.albedo={1,1,1};
-        m.metallic=met; m.roughness=rou;
-        m.albedoTex=tex;
+        m.albedo={1,1,1}; m.metallic=met;
+        m.roughness=rou;  m.albedoTex=tex;
         return m;
     };
 
     MaterialData groundMat = makeMat(groundTex,0,0.9f);
     groundMat.texTileX=8; groundMat.texTileY=8;
 
-    // ── Build scene ───────────────────────────────────────
-    std::vector<PhysicsObject> physObjects;
+    // ── Ground plane (physics only) ───────────────────────
+    physics->GetWorld()->AddGroundPlane(0.0f, 0.6f, 0.6f);
 
-    // Ground plane at y=0 (physics only, no visual mesh)
-    // Using AddGroundPlane which sets planeOffset=0
-    {
-        u32 id = physics->GetWorld()->AddGroundPlane(
-            0.0f, 0.6f, 0.6f);
-        PhysicsObject obj;
-        obj.name="Ground"; obj.bodyID=id;
-        obj.isStatic=true; obj.isGround=true;
-        physObjects.push_back(obj);
+    // ── Load scene from JSON ──────────────────────────────
+    std::string scenePath =
+        "..\\..\\..\\Assets\\Scenes\\TestLevel.json";
+
+    logger->Info("Main","Loading scene: TestLevel.json");
+    auto loadResult = scene->LoadScene(scenePath);
+    if (loadResult.IsOk()) {
+        logger->Info("Main",
+            "Scene loaded! Nodes: " +
+            std::to_string(scene->GetNodeCount()));
+    } else {
+        logger->Warning("Main",
+            "Scene load failed: " +
+            loadResult.Error().message);
+
+        // Fallback: create scene manually
+        logger->Info("Main",
+            "Creating scene manually...");
+        scene->NewScene("ManualScene");
+
+        // Platform
+        SceneNodeDesc platDesc;
+        platDesc.name     = "Platform";
+        platDesc.position = {0, 4, 0};
+        platDesc.hasPhysics = true;
+        platDesc.physics.isStatic = true;
+        platDesc.physics.colliderShape = "box";
+        platDesc.physics.halfExtents   = {3,0.3f,3};
+        scene->CreateNode(platDesc);
+
+        // Red sphere
+        SceneNodeDesc sphDesc;
+        sphDesc.name     = "RedSphere";
+        sphDesc.position = {-2, 10, 0};
+        sphDesc.hasPhysics = true;
+        sphDesc.physics.mass = 1.0f;
+        sphDesc.physics.colliderShape = "sphere";
+        sphDesc.physics.radius = 0.5f;
+        sphDesc.physics.restitution = 0.7f;
+        scene->CreateNode(sphDesc);
+
+        // Gold box
+        SceneNodeDesc boxDesc;
+        boxDesc.name     = "GoldBox";
+        boxDesc.position = {2, 12, 1};
+        boxDesc.hasPhysics = true;
+        boxDesc.physics.mass = 2.0f;
+        boxDesc.physics.colliderShape = "box";
+        boxDesc.physics.halfExtents   = {0.5f,0.5f,0.5f};
+        scene->CreateNode(boxDesc);
+
+        logger->Info("Main","Manual scene created");
     }
-
-    // Platform - uses PLANE collider for reliable collision
-    // Visual mesh is a box, but physics uses an infinite plane at y=4
-    // This prevents ANY object from falling through
-    u32 platformBodyID = 0;
-    {
-        RigidBodyDesc desc;
-        desc.position   = {0,4,0};
-        desc.isStatic   = true;
-        desc.useGravity = false;
-        desc.collider.shape       = ColliderShape::Plane;
-        desc.collider.planeNormal = {0, 1, 0};
-        desc.collider.planeOffset = 4.0f;  // at y=4
-        desc.collider.restitution = 0.5f;
-        desc.collider.friction    = 0.5f;
-        platformBodyID = physics->GetWorld()->AddBody(desc);
-
-        PhysicsObject obj;
-        obj.name="Platform"; obj.bodyID=platformBodyID;
-        obj.mesh=cubeMesh;
-        obj.scale={6,0.4f,6};
-        obj.material=makeMat(grayTex,0.5f,0.3f);
-        obj.isStatic=true; obj.isPlatform=true;
-        physObjects.push_back(obj);
-    }
-
-    std::mt19937 rng(42);
-    auto randF = [&](f32 lo, f32 hi) {
-        return lo + (hi-lo) *
-            static_cast<f32>(rng()) /
-            static_cast<f32>(rng.max());
-    };
-
-    // 5 spheres
-    for (int i = 0; i < 5; i++) {
-        RigidBodyDesc desc;
-        desc.position = {
-            randF(-4,4), randF(6,14), randF(-4,4)};
-        desc.mass     = randF(0.5f,3.0f);
-        desc.collider.shape       = ColliderShape::Sphere;
-        desc.collider.radius      = 0.5f;
-        desc.collider.restitution = randF(0.3f,0.8f);
-        desc.collider.friction    = 0.5f;
-        desc.velocity = {randF(-2,2),0,randF(-2,2)};
-
-        u32 id = physics->GetWorld()->AddBody(desc);
-        PhysicsObject obj;
-        obj.name    = "Sphere_"+std::to_string(i);
-        obj.bodyID  = id;
-        obj.mesh    = sphereMesh;
-        obj.scale   = {1,1,1};
-        obj.material= makeMat(
-            (i%2==0)?redTex:blueTex, 0.3f,0.4f);
-        physObjects.push_back(obj);
-    }
-
-    // 5 boxes
-    for (int i = 0; i < 5; i++) {
-        f32 s = randF(0.4f,1.2f);
-        RigidBodyDesc desc;
-        desc.position = {
-            randF(-5,5), randF(8,16), randF(-5,5)};
-        desc.mass     = s*2.0f;
-        desc.collider.shape       = ColliderShape::Box;
-        desc.collider.halfExtents = {s,s,s};
-        desc.collider.restitution = 0.3f;
-        desc.collider.friction    = 0.6f;
-        desc.angularVelocity = {
-            randF(-2,2), randF(-2,2), randF(-2,2)};
-
-        u32 id = physics->GetWorld()->AddBody(desc);
-        PhysicsObject obj;
-        obj.name    = "Box_"+std::to_string(i);
-        obj.bodyID  = id;
-        obj.mesh    = cubeMesh;
-        obj.scale   = {s*2,s*2,s*2};
-        obj.material= makeMat(
-            (i%2==0)?goldTex:greenTex, 0.2f,0.5f);
-        physObjects.push_back(obj);
-    }
-
-    // Dynamic objects list (for TAB selection)
-    // Indices into physObjects that are dynamic
-    std::vector<u32> dynamicIndices;
-    for (u32 i = 0;
-         i < static_cast<u32>(physObjects.size()); i++) {
-        if (!physObjects[i].isStatic &&
-            !physObjects[i].isGround &&
-            !physObjects[i].isPlatform) {
-            dynamicIndices.push_back(i);
-        }
-    }
-
-    i32 selectedDynIdx = 0;  // index into dynamicIndices
 
     // ── Camera ────────────────────────────────────────────
     Camera camera;
-    Vec3 defaultCamPos = {0,10,20};
-    f32  defaultYaw    = -90.0f;
-    f32  defaultPitch  = -25.0f;
-
-    camera.SetPosition   (defaultCamPos);
+    camera.SetPosition   ({0,10,20});
     camera.SetFOV        (60.0f);
     camera.SetAspectRatio(1280.0f/720.0f);
     camera.SetClipPlanes (0.1f,200.0f);
-    camera.RotatePitch   (defaultPitch);
-
-    f32 camYaw   = defaultYaw;
-    f32 camPitch = defaultPitch;
+    camera.RotatePitch   (-25.0f);
+    f32 camYaw=-90.0f, camPitch=-25.0f;
 
     Light sun;
     sun.type      = LightType::Directional;
@@ -262,38 +196,25 @@ int main()
     sun.intensity = 1.8f;
 
     logger->Info("Main","=================================");
-    logger->Info("Main","PHYSICS DEMO");
+    logger->Info("Main","SCENE SYSTEM DEMO");
     logger->Info("Main","  WASD+QE   = Move camera");
     logger->Info("Main","  Arrows    = Rotate camera");
-    logger->Info("Main","  SPACE     = Drop sphere");
-    logger->Info("Main","  B         = Drop box");
-    logger->Info("Main","  TAB       = Select next object");
-    logger->Info("Main","  G         = Toggle gravity");
-    logger->Info("Main","  R         = Reset camera");
+    logger->Info("Main","  S_KEY     = Save scene");
+    logger->Info("Main","  L_KEY     = Load scene");
+    logger->Info("Main","  N_KEY     = New scene");
     logger->Info("Main","  F         = Wireframe");
     logger->Info("Main","  H         = Toggle HUD");
     logger->Info("Main","  ESC       = Quit");
     logger->Info("Main","=================================");
 
-    logger->Info("Main",
-        "Selected: " +
-        physObjects[dynamicIndices[
-            selectedDynIdx]].name);
-
-    // Key trackers
-    KeyTracker spaceKey, bKey, gKey, rKey,
-               fKey,    hKey, tabKey;
-    bool gravityOn = true;
-    bool wireframe = false;
-    u32  frameCount  = 0;
-    u64  totalFrames = 0;
-    u32  dropCount   = 0;
-
+    KeyTracker saveKey, loadKey, newKey, fKey, hKey;
+    bool wireframe  = false;
+    u32  frameCount = 0;
+    u64  totalFrames= 0;
     const f32 camSpd = 8.0f;
     const f32 rotSpd = 60.0f;
     const f32 dt     = 0.016f;
 
-    // ── Main Loop ─────────────────────────────────────────
     while (!device->ShouldClose())
     {
         device->BeginFrame();
@@ -303,13 +224,13 @@ int main()
         if (input && input->IsKeyDown(Key::Escape)) break;
 
         if (input) {
-            // Camera (held)
             if (input->IsKeyDown(Key::W))
                 camera.MoveForward(-camSpd*dt);
-            if (input->IsKeyDown(Key::S))
-                camera.MoveForward( camSpd*dt);
             if (input->IsKeyDown(Key::A))
                 camera.MoveRight  (-camSpd*dt);
+            if (input->IsKeyDown(Key::S) &&
+                !saveKey.wasDown)
+                camera.MoveForward( camSpd*dt);
             if (input->IsKeyDown(Key::D))
                 camera.MoveRight  ( camSpd*dt);
             if (input->IsKeyDown(Key::Q))
@@ -333,141 +254,67 @@ int main()
                 camPitch -= rotSpd*dt;
             }
 
-            // TAB — cycle selected dynamic object
-            if (tabKey.Pressed(
-                    input->IsKeyDown(Key::Tab))) {
-                if (!dynamicIndices.empty()) {
-                    selectedDynIdx =
-                        (selectedDynIdx + 1) %
-                        static_cast<i32>(
-                            dynamicIndices.size());
+            // S = Save scene
+            bool sDown = input->IsKeyDown(Key::S);
+            if (saveKey.Pressed(sDown)) {
+                auto r = scene->SaveScene(scenePath);
+                if (r.IsOk()) {
                     logger->Info("Main",
-                        "Selected: " +
-                        physObjects[
-                            dynamicIndices[
-                                selectedDynIdx]].name);
+                        "Scene SAVED to: " + scenePath);
+                } else {
+                    logger->Error("Main",
+                        "Save failed: " +
+                        r.Error().message);
                 }
             }
 
-            // SPACE — drop sphere (once per press)
-            if (spaceKey.Pressed(
-                    input->IsKeyDown(Key::Space))) {
-                Vec3 p = camera.GetPosition();
-                RigidBodyDesc desc;
-                desc.position = {p.x, p.y+1, p.z-4};
-                desc.mass     = 1.0f;
-                desc.collider.shape       =
-                    ColliderShape::Sphere;
-                desc.collider.radius      = 0.5f;
-                desc.collider.restitution = 0.7f;
-                desc.velocity = {0, 3, -10};
+            // L = Load scene
+            if (loadKey.Pressed(
+                    input->IsKeyDown(Key::L))) {
+                auto r = scene->LoadScene(scenePath);
+                if (r.IsOk()) {
+                    logger->Info("Main",
+                        "Scene LOADED. Nodes: " +
+                        std::to_string(
+                            scene->GetNodeCount()));
+                } else {
+                    logger->Error("Main",
+                        "Load failed: " +
+                        r.Error().message);
+                }
+            }
 
-                u32 id = physics->GetWorld()->AddBody(desc);
-                u32 objIdx = static_cast<u32>(
-                    physObjects.size());
-
-                PhysicsObject obj;
-                obj.name    = "Sphere_drop_" +
-                    std::to_string(++dropCount);
-                obj.bodyID  = id;
-                obj.mesh    = sphereMesh;
-                obj.scale   = {1,1,1};
-                obj.material= makeMat(cyanTex,0.5f,0.3f);
-                physObjects.push_back(obj);
-                dynamicIndices.push_back(objIdx);
-
+            // N = New empty scene
+            if (newKey.Pressed(
+                    input->IsKeyDown(Key::N))) {
+                scene->NewScene("NewScene");
                 logger->Info("Main",
-                    "Dropped sphere " +
-                    std::to_string(dropCount));
+                    "New empty scene created");
             }
 
-            // B — drop box (once per press)
-            if (bKey.Pressed(
-                    input->IsKeyDown(Key::B))) {
-                Vec3 p = camera.GetPosition();
-                RigidBodyDesc desc;
-                desc.position = {p.x, p.y+1, p.z-4};
-                desc.mass     = 2.0f;
-                desc.collider.shape       =
-                    ColliderShape::Box;
-                desc.collider.halfExtents =
-                    {0.5f,0.5f,0.5f};
-                desc.collider.restitution = 0.3f;
-                desc.velocity = {0, 3, -10};
-                desc.angularVelocity = {2,3,1};
-
-                u32 id = physics->GetWorld()->AddBody(desc);
-                u32 objIdx = static_cast<u32>(
-                    physObjects.size());
-
-                PhysicsObject obj;
-                obj.name    = "Box_drop_" +
-                    std::to_string(++dropCount);
-                obj.bodyID  = id;
-                obj.mesh    = cubeMesh;
-                obj.scale   = {1,1,1};
-                obj.material= makeMat(
-                    goldTex,0.3f,0.5f);
-                physObjects.push_back(obj);
-                dynamicIndices.push_back(objIdx);
-
-                logger->Info("Main","Dropped box " +
-                    std::to_string(dropCount));
-            }
-
-            // G — toggle gravity
-            if (gKey.Pressed(
-                    input->IsKeyDown(Key::G))) {
-                gravityOn = !gravityOn;
-                physics->SetGravity(
-                    gravityOn ?
-                    Vec3{0,-9.81f,0} : Vec3{0,0,0});
-                logger->Info("Main",
-                    gravityOn ?
-                    "Gravity ON  (9.81 m/s^2)" :
-                    "Gravity OFF (zero-G mode)");
-            }
-
-            // R — reset camera to default position
-            if (rKey.Pressed(
-                    input->IsKeyDown(Key::R))) {
-                // Recreate camera from scratch
-                camera = Camera();
-                camera.SetPosition   (defaultCamPos);
-                camera.SetFOV        (60.0f);
-                camera.SetAspectRatio(1280.0f/720.0f);
-                camera.SetClipPlanes (0.1f,200.0f);
-                camera.RotatePitch   (defaultPitch);
-                camYaw   = defaultYaw;
-                camPitch = defaultPitch;
-                logger->Info("Main","Camera reset to default");
-            }
-
-            // F — wireframe
+            // F = wireframe
             if (fKey.Pressed(
                     input->IsKeyDown(Key::F))) {
                 wireframe = !wireframe;
                 renderer->SetWireframe(wireframe);
-                logger->Info("Main",
-                    wireframe ? "Wireframe ON"
-                              : "Wireframe OFF");
             }
 
-            // H — toggle HUD
+            // H = HUD
             if (hKey.Pressed(
                     input->IsKeyDown(Key::H))) {
                 hud.ToggleVisible();
             }
         }
 
-        // Step physics
+        // Update systems
         physMod->OnUpdate(dt);
+        sceneMod->OnUpdate(dt);
 
         // ── Render ────────────────────────────────────────
         renderer->BeginFrame(camera);
         renderer->SubmitLight(sun);
 
-        // Ground plane (visual only)
+        // Ground (always rendered)
         {
             DrawCall dc;
             dc.mesh      = planeMesh;
@@ -476,63 +323,100 @@ int main()
             renderer->Submit(dc);
         }
 
-        // Platform (use stored platformBodyID)
-        {
-            auto* body = physics->GetBody(platformBodyID);
-            if (body) {
-                DrawCall dc;
-                dc.mesh      = cubeMesh;
-                dc.material  = makeMat(grayTex,0.5f,0.3f);
-                dc.transform = Math::TRS(
-                    body->GetPosition(), 0, {6,0.4f,6});
-                renderer->Submit(dc);
+        // Render all scene nodes
+        scene->ForEachNode([&](ISceneNode* node) {
+            if (!node->IsActive()) return;
+
+            Vec3 pos = node->GetLocalPosition();
+            Vec3 rot = node->GetLocalRotation();
+            Vec3 scl = node->GetLocalScale();
+
+            // Get physics position if available
+            auto* sNode =
+                static_cast<SceneNode*>(node);
+            if (sNode->hasPhysics &&
+                sNode->GetPhysicsBodyID() == 0) {
+                // Get from physics via ECS
+                EntityID eid = node->GetEntityID();
+                if (eid != 0) {
+                    Vec3 physPos =
+                        physics->GetVelocity(eid);
+                    RIFTCORE_UNUSED(physPos);
+                }
             }
-        }
 
-        // All dynamic objects
-        i32 dynCount = 0;
-        for (u32 dynIdx = 0;
-             dynIdx < static_cast<u32>(
-                 dynamicIndices.size());
-             dynIdx++)
-        {
-            u32 objIdx = dynamicIndices[dynIdx];
-            auto& obj  = physObjects[objIdx];
-            if (!obj.mesh) continue;
+            // Choose mesh based on physics shape
+            GPUMesh* mesh = cubeMesh;
+            MaterialData mat = makeMat(grayTex);
 
-            auto* body = physics->GetBody(obj.bodyID);
-            if (!body) continue;
+            if (sNode->hasPhysics) {
+                String shape =
+                    sNode->physicsDesc.colliderShape;
+                if (shape == "sphere") {
+                    mesh = sphereMesh;
+                } else if (shape == "plane") {
+                    mesh = planeMesh;
+                    mat  = groundMat;
+                }
+            }
 
-            Vec3 pos = body->GetPosition();
-            Vec3 rot = body->GetRotation();
+            // Material color from mesh desc
+            if (sNode->hasMesh) {
+                Vec3 alb = sNode->meshDesc.albedo;
+                if (alb.x > 0.7f && alb.y < 0.4f)
+                    mat = makeMat(redTex,
+                        sNode->meshDesc.metallic,
+                        sNode->meshDesc.roughness);
+                else if (alb.z > 0.7f)
+                    mat = makeMat(blueTex,
+                        sNode->meshDesc.metallic,
+                        sNode->meshDesc.roughness);
+                else if (alb.x > 0.7f && alb.y > 0.5f)
+                    mat = makeMat(goldTex,
+                        sNode->meshDesc.metallic,
+                        sNode->meshDesc.roughness);
+                else if (alb.x < 0.5f && alb.y > 0.5f)
+                    mat = makeMat(groundTex,0,0.9f);
+                else
+                    mat = makeMat(grayTex,
+                        sNode->meshDesc.metallic,
+                        sNode->meshDesc.roughness);
+            }
+
+            // Skip infinite ground plane visual
+            if (sNode->hasPhysics &&
+                sNode->physicsDesc.colliderShape ==
+                "plane") return;
+
+            // Platform scaling
+            Vec3 renderScale = scl;
+            if (sNode->hasPhysics) {
+                auto& he =
+                    sNode->physicsDesc.halfExtents;
+                if (sNode->physicsDesc.colliderShape
+                    == "box") {
+                    renderScale = {
+                        he.x * 2.0f,
+                        he.y * 2.0f,
+                        he.z * 2.0f
+                    };
+                }
+            }
 
             DrawCall dc;
-            dc.mesh      = obj.mesh;
-            dc.material  = obj.material;
+            dc.mesh      = mesh;
+            dc.material  = mat;
             dc.transform = Math::TRSFull(
                 pos,
-                rot.x * 57.2958f,
-                rot.y * 57.2958f,
-                rot.z * 57.2958f,
-                obj.scale
-            );
-
-            // Highlight selected object
-            if (dynIdx == static_cast<u32>(
-                    selectedDynIdx)) {
-                dc.material.albedo = {1.5f,1.5f,0.8f};
-            }
-
+                rot.x, rot.y, rot.z,
+                renderScale);
             renderer->Submit(dc);
-            dynCount++;
-        }
+        });
 
         renderer->EndFrame();
 
-        // ── HUD ───────────────────────────────────────────
-        auto stats     = renderer->GetStats();
-        auto physStats = physics->GetWorld()->GetStats();
-
+        // HUD
+        auto stats = renderer->GetStats();
         HUDRenderStats hudStats;
         hudStats.drawCalls  = stats.drawCalls;
         hudStats.triangles  = stats.triangles;
@@ -544,42 +428,20 @@ int main()
         hudCam.posZ=camPos.z;
         hudCam.yaw=camYaw; hudCam.pitch=camPitch;
 
+        // Scene nodes as HUD objects
         std::vector<HUDObjectInfo> hudObjs;
-        for (u32 dynIdx = 0;
-             dynIdx < static_cast<u32>(
-                 dynamicIndices.size());
-             dynIdx++)
-        {
-            u32 objIdx = dynamicIndices[dynIdx];
-            auto& obj  = physObjects[objIdx];
-            auto* body = physics->GetBody(obj.bodyID);
-            if (!body) continue;
-
-            Vec3 pos = body->GetPosition();
-            Vec3 vel = body->GetVelocity();
-
+        i32 idx = 0;
+        scene->ForEachNode([&](ISceneNode* node) {
             HUDObjectInfo info;
-            info.index  = static_cast<i32>(dynIdx);
-            info.name   = obj.name +
-                (body->IsAwake() ? "" : " [sleep]");
-            info.posX   = pos.x;
-            info.posY   = pos.y;
-            info.posZ   = pos.z;
-            info.rotX   = vel.x;
-            info.rotY   = vel.y;
-            info.rotZ   = vel.z;
-            info.scaleX = body->GetMass();
-            info.scaleY = physStats.stepTimeMs;
-            info.scaleZ = static_cast<f32>(
-                physStats.activeCount);
-            info.isSelected =
-                (dynIdx == static_cast<u32>(
-                    selectedDynIdx));
+            info.index  = idx++;
+            info.name   = node->GetName();
+            Vec3 p      = node->GetLocalPosition();
+            info.posX=p.x; info.posY=p.y;
+            info.posZ=p.z;
             hudObjs.push_back(info);
-        }
+        });
 
-        hud.Render(hudStats, selectedDynIdx,
-                   hudObjs, hudCam);
+        hud.Render(hudStats, 0, hudObjs, hudCam);
         hud.EndFrame();
 
         device->Present();
@@ -587,27 +449,13 @@ int main()
         totalFrames++;
 
         if (frameCount % 300 == 0) {
-            auto& selObj = physObjects[
-                dynamicIndices[selectedDynIdx]];
-            auto* selBody = physics->GetBody(
-                selObj.bodyID);
-            if (selBody) {
-                Vec3 p = selBody->GetPosition();
-                logger->Info("Main",
-                    "Selected: " + selObj.name +
-                    " pos=(" +
-                    std::to_string(
-                        static_cast<int>(p.x)) + "," +
-                    std::to_string(
-                        static_cast<int>(p.y)) + "," +
-                    std::to_string(
-                        static_cast<int>(p.z)) + ")" +
-                    " Bodies=" +
-                    std::to_string(physStats.bodyCount) +
-                    " Active=" +
-                    std::to_string(physStats.activeCount)
-                );
-            }
+            auto si = scene->GetSceneInfo();
+            logger->Info("Main",
+                "Scene: " + si.name +
+                " Nodes: " +
+                std::to_string(si.nodeCount) +
+                " Frame: " +
+                std::to_string(frameCount));
         }
     }
 
@@ -622,6 +470,3 @@ int main()
     engine.Shutdown();
     return 0;
 }
-
-
-

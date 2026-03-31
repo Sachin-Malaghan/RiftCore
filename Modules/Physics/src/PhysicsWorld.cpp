@@ -6,20 +6,33 @@
 #include <iostream>
 #include <chrono>
 #include <cmath>
-#include <cstring>
 
 namespace RiftCore {
+
+    // ── Math helpers ──────────────────────────────────────────
+    static f32 Dot(const Vec3& a, const Vec3& b) {
+        return a.x*b.x + a.y*b.y + a.z*b.z;
+    }
+
+    static f32 Length(const Vec3& v) {
+        return std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    }
+
+    static Vec3 Normalize(const Vec3& v) {
+        f32 len = Length(v);
+        if (len < 0.00001f) return {0,1,0};
+        return {v.x/len, v.y/len, v.z/len};
+    }
 
     // ── PhysicsWorld ──────────────────────────────────────────
     PhysicsWorld::PhysicsWorld()  = default;
     PhysicsWorld::~PhysicsWorld() = default;
 
-    void PhysicsWorld::SetGravity(const Vec3& gravity) {
-        gravity_ = gravity;
+    void PhysicsWorld::SetGravity(const Vec3& g) {
+        gravity_ = g;
     }
 
     u32 PhysicsWorld::AddBody(const RigidBodyDesc& desc) {
-        std::lock_guard<std::mutex> lock(mutex_);
         u32 id    = nextID_++;
         u32 index = static_cast<u32>(bodies_.size());
         bodies_.emplace_back(id, desc);
@@ -31,9 +44,9 @@ namespace RiftCore {
         f32 y, f32 restitution, f32 friction
     ) {
         RigidBodyDesc desc;
-        desc.isStatic    = true;
-        desc.useGravity  = false;
-        desc.position    = {0, y, 0};
+        desc.isStatic         = true;
+        desc.useGravity       = false;
+        desc.position         = {0, y, 0};
         desc.collider.shape       = ColliderShape::Plane;
         desc.collider.planeNormal = {0, 1, 0};
         desc.collider.planeOffset = y;
@@ -43,18 +56,16 @@ namespace RiftCore {
     }
 
     void PhysicsWorld::RemoveBody(u32 id) {
-        std::lock_guard<std::mutex> lock(mutex_);
         auto it = idToIndex_.find(id);
         if (it == idToIndex_.end()) return;
 
-        u32 index   = it->second;
+        u32 idx     = it->second;
         u32 lastIdx = static_cast<u32>(bodies_.size()-1);
 
-        if (index != lastIdx) {
-            bodies_[index] = std::move(bodies_[lastIdx]);
-            idToIndex_[bodies_[index].GetID()] = index;
+        if (idx != lastIdx) {
+            bodies_[idx] = std::move(bodies_[lastIdx]);
+            idToIndex_[bodies_[idx].GetID()] = idx;
         }
-
         bodies_.pop_back();
         idToIndex_.erase(id);
     }
@@ -65,306 +76,286 @@ namespace RiftCore {
         return &bodies_[it->second];
     }
 
+    // ── Main simulation step ──────────────────────────────────
     void PhysicsWorld::Step(f32 dt) {
-        auto start = std::chrono::high_resolution_clock::now();
+        auto t0 = std::chrono::high_resolution_clock::now();
 
-        f32 subDt = dt / static_cast<f32>(subSteps_);
+        // Fixed substeps for stability
+        f32  subDt       = dt / static_cast<f32>(subSteps_);
+        u32  totalPairs  = 0;
+        u32  totalContacts = 0;
 
-        for (u32 step = 0; step < subSteps_; step++) {
-            IntegrateBodies(subDt);
+        for (u32 s = 0; s < subSteps_; s++) {
+            // 1. Integrate positions
+            for (auto& body : bodies_) {
+                body.Integrate(subDt, gravity_);
+            }
 
+            // 2. Find overlapping pairs
             std::vector<std::pair<u32,u32>> pairs;
             BroadPhase(pairs);
+            totalPairs += static_cast<u32>(pairs.size());
 
+            // 3. Generate contacts
             std::vector<ContactPoint> contacts;
             NarrowPhase(pairs, contacts);
-
-            ResolveContacts(contacts);
-
-            stats_.contactCount   = static_cast<u32>(
+            totalContacts += static_cast<u32>(
                 contacts.size());
-            stats_.collisionPairs = static_cast<u32>(
-                pairs.size());
+
+            // 4. Resolve contacts (multiple iterations)
+            const u32 solverIter = 6;
+            for (u32 iter = 0; iter < solverIter; iter++) {
+                for (auto& c : contacts) {
+                    ResolveVelocity(c);
+                }
+            }
+
+            // 5. Positional correction
+            for (auto& c : contacts) {
+                PositionalCorrect(c);
+            }
+
+            // 6. Wake bodies that had contacts
+            for (auto& c : contacts) {
+                bodies_[c.bodyA].Wake();
+                bodies_[c.bodyB].Wake();
+            }
         }
 
-        // Count active bodies
+        // Update stats
         u32 active = 0;
         for (auto& b : bodies_) {
             if (b.IsAwake() && !b.IsStatic()) active++;
         }
-        stats_.bodyCount  = static_cast<u32>(bodies_.size());
-        stats_.activeCount= active;
+        stats_.bodyCount      = static_cast<u32>(
+            bodies_.size());
+        stats_.activeCount    = active;
+        stats_.contactCount   = totalContacts;
+        stats_.collisionPairs = totalPairs;
 
-        auto end = std::chrono::high_resolution_clock::now();
+        auto t1 = std::chrono::high_resolution_clock::now();
         stats_.stepTimeMs = std::chrono::duration<f32,
-            std::milli>(end - start).count();
+            std::milli>(t1 - t0).count();
 
-        // Debug: print contact count every 120 frames
-        static u32 debugFrame = 0;
-        debugFrame++;
-        if (debugFrame % 120 == 0 &&
-            stats_.contactCount > 0) {
-            // Has contacts - collision working
-        }
-        if (debugFrame % 120 == 0 &&
-            stats_.bodyCount > 2 &&
-            stats_.contactCount == 0 &&
-            stats_.activeCount > 0) {
-            std::cout << "[Physics] WARNING: " <<
-                stats_.activeCount <<
-                " active bodies, 0 contacts detected. "
-                "Check collider setup.\n";
-        }
-    }
-
-    void PhysicsWorld::IntegrateBodies(f32 dt) {
-        for (auto& body : bodies_) {
-            body.Integrate(dt, gravity_);
+        // Debug every 120 frames
+        static u32 dbgFrame = 0;
+        if (++dbgFrame % 120 == 0) {
+            f32 lowestY = 9999.0f;
+            for (auto& b : bodies_) {
+                if (!b.IsStatic()) {
+                    lowestY = std::min(lowestY,
+                        b.GetPosition().y);
+                }
+            }
+            std::cout
+                << "[Physics] bodies=" << stats_.bodyCount
+                << " active=" << stats_.activeCount
+                << " pairs="  << totalPairs
+                << " contacts=" << totalContacts
+                << " lowestY=" << lowestY
+                << "\n";
         }
     }
 
+    // ── BroadPhase ────────────────────────────────────────────
     void PhysicsWorld::BroadPhase(
         std::vector<std::pair<u32,u32>>& pairs
     ) {
-        u32 count = static_cast<u32>(bodies_.size());
-        for (u32 i = 0; i < count; i++) {
-            for (u32 j = i+1; j < count; j++) {
+        u32 n = static_cast<u32>(bodies_.size());
+        for (u32 i = 0; i < n; i++) {
+            for (u32 j = i+1; j < n; j++) {
                 RigidBody& a = bodies_[i];
                 RigidBody& b = bodies_[j];
 
-                // Skip static-static pairs
+                // Skip static vs static
                 if (a.IsStatic() && b.IsStatic()) continue;
 
-                // Skip sleeping pairs
-                // Skip only if BOTH are sleeping AND neither is static
-                // Static bodies can wake sleeping objects
-                if (!a.IsAwake() && !b.IsAwake() &&
-                    !a.IsStatic() && !b.IsStatic()) continue;
+                // At least one must be active
+                // Static bodies count as always active
+                bool aOk = a.IsAwake() || a.IsStatic();
+                bool bOk = b.IsAwake() || b.IsStatic();
+                if (!aOk && !bOk) continue;
 
-                AABB aabbA = a.GetAABB();
-                AABB aabbB = b.GetAABB();
-
-                if (aabbA.Overlaps(aabbB)) {
+                // AABB test
+                if (a.GetAABB().Overlaps(b.GetAABB())) {
                     pairs.push_back({i, j});
                 }
             }
         }
     }
 
+    // ── NarrowPhase ───────────────────────────────────────────
     void PhysicsWorld::NarrowPhase(
         const std::vector<std::pair<u32,u32>>& pairs,
         std::vector<ContactPoint>&              contacts
     ) {
         for (auto& [iA, iB] : pairs) {
-            auto& bodyA = bodies_[iA];
-            auto& bodyB = bodies_[iB];
+            RigidBody& bodyA = bodies_[iA];
+            RigidBody& bodyB = bodies_[iB];
 
-            ContactPoint contact;
-            contact.bodyA = iA;
-            contact.bodyB = iB;
+            ColliderShape sA = bodyA.GetCollider().shape;
+            ColliderShape sB = bodyB.GetCollider().shape;
 
-            ColliderShape shapeA = bodyA.GetCollider().shape;
-            ColliderShape shapeB = bodyB.GetCollider().shape;
-
+            ContactPoint c;
+            c.bodyA = iA;
+            c.bodyB = iB;
             bool hit = false;
 
-            // Sphere vs Sphere
-            if (shapeA == ColliderShape::Sphere &&
-                shapeB == ColliderShape::Sphere) {
-                hit = TestSphereSphere(bodyA, bodyB, contact);
+            // Dispatch to correct test
+            if (sA == ColliderShape::Sphere &&
+                sB == ColliderShape::Sphere) {
+                hit = TestSphereSphere(bodyA,bodyB,c);
             }
-            // Sphere vs Box
-            else if (shapeA == ColliderShape::Sphere &&
-                     shapeB == ColliderShape::Box) {
-                hit = TestSphereBox(bodyA, bodyB, contact);
+            else if (sA == ColliderShape::Sphere &&
+                     sB == ColliderShape::Box) {
+                hit = TestSphereBox(bodyA,bodyB,c);
             }
-            // Box vs Sphere
-            else if (shapeA == ColliderShape::Box &&
-                     shapeB == ColliderShape::Sphere) {
-                hit = TestSphereBox(bodyB, bodyA, contact);
+            else if (sA == ColliderShape::Box &&
+                     sB == ColliderShape::Sphere) {
+                hit = TestSphereBox(bodyB,bodyA,c);
                 if (hit) {
-                    // Flip normal
-                    contact.normal.x = -contact.normal.x;
-                    contact.normal.y = -contact.normal.y;
-                    contact.normal.z = -contact.normal.z;
-                    std::swap(contact.bodyA, contact.bodyB);
+                    // Flip normal — sphere was B
+                    c.normal.x = -c.normal.x;
+                    c.normal.y = -c.normal.y;
+                    c.normal.z = -c.normal.z;
+                    std::swap(c.bodyA, c.bodyB);
                 }
             }
-            // Box vs Box
-            else if (shapeA == ColliderShape::Box &&
-                     shapeB == ColliderShape::Box) {
-                hit = TestBoxBox(bodyA, bodyB, contact);
+            else if (sA == ColliderShape::Box &&
+                     sB == ColliderShape::Box) {
+                hit = TestBoxBox(bodyA,bodyB,c);
             }
-            // Sphere vs Plane
-            else if (shapeA == ColliderShape::Sphere &&
-                     shapeB == ColliderShape::Plane) {
-                hit = TestSpherePlane(bodyA, bodyB, contact);
+            else if (sA == ColliderShape::Sphere &&
+                     sB == ColliderShape::Plane) {
+                hit = TestSpherePlane(bodyA,bodyB,c);
             }
-            // Plane vs Sphere - swap so sphere=first
-            else if (shapeA == ColliderShape::Plane &&
-                     shapeB == ColliderShape::Sphere) {
-                hit = TestSpherePlane(bodyB, bodyA, contact);
+            else if (sA == ColliderShape::Plane &&
+                     sB == ColliderShape::Sphere) {
+                // Swap so sphere=A, plane=B
+                hit = TestSpherePlane(bodyB,bodyA,c);
                 if (hit) {
-                    // Flip because we swapped bodies
-                    contact.normal.x = -contact.normal.x;
-                    contact.normal.y = -contact.normal.y;
-                    contact.normal.z = -contact.normal.z;
-                    std::swap(contact.bodyA, contact.bodyB);
+                    std::swap(c.bodyA, c.bodyB);
                 }
             }
-            // Box vs Plane
-            else if (shapeA == ColliderShape::Box &&
-                     shapeB == ColliderShape::Plane) {
-                hit = TestBoxPlane(bodyA, bodyB, contact);
+            else if (sA == ColliderShape::Box &&
+                     sB == ColliderShape::Plane) {
+                hit = TestBoxPlane(bodyA,bodyB,c);
             }
-            // Plane vs Box - swap so box=first
-            else if (shapeA == ColliderShape::Plane &&
-                     shapeB == ColliderShape::Box) {
-                hit = TestBoxPlane(bodyB, bodyA, contact);
+            else if (sA == ColliderShape::Plane &&
+                     sB == ColliderShape::Box) {
+                // Swap so box=A, plane=B
+                hit = TestBoxPlane(bodyB,bodyA,c);
                 if (hit) {
-                    contact.normal.x = -contact.normal.x;
-                    contact.normal.y = -contact.normal.y;
-                    contact.normal.z = -contact.normal.z;
-                    std::swap(contact.bodyA, contact.bodyB);
+                    std::swap(c.bodyA, c.bodyB);
                 }
             }
 
-            if (hit) {
-                contacts.push_back(contact);
+            if (hit && c.penetration > 0.0f) {
+                contacts.push_back(c);
                 if (collisionCallback_) {
                     collisionCallback_(
                         bodyA.GetID(),
-                        bodyB.GetID(),
-                        contact
-                    );
+                        bodyB.GetID(), c);
                 }
-                // Wake bodies on collision
-                bodies_[iA].Wake();
-                bodies_[iB].Wake();
             }
         }
     }
 
+    // ── Collision tests ───────────────────────────────────────
     bool PhysicsWorld::TestSphereSphere(
-        RigidBody& a, RigidBody& b,
-        ContactPoint& contact
+        RigidBody& a, RigidBody& b, ContactPoint& c
     ) {
         Vec3 posA = a.GetPosition();
         Vec3 posB = b.GetPosition();
         f32  rA   = a.GetCollider().radius;
         f32  rB   = b.GetCollider().radius;
+        f32  rSum = rA + rB;
 
-        Vec3 diff = {
-            posA.x - posB.x,
-            posA.y - posB.y,
-            posA.z - posB.z
-        };
-        f32 distSq = diff.x*diff.x +
-                     diff.y*diff.y +
-                     diff.z*diff.z;
-        f32 sumR = rA + rB;
+        Vec3 diff = {posA.x-posB.x, posA.y-posB.y,
+                     posA.z-posB.z};
+        f32  dist = Length(diff);
 
-        if (distSq >= sumR * sumR) return false;
+        if (dist >= rSum || dist < 0.0001f) return false;
 
-        f32  dist    = std::sqrt(distSq);
-        Vec3 normal  = dist > 0.0001f
-            ? Vec3{diff.x/dist, diff.y/dist, diff.z/dist}
-            : Vec3{0,1,0};
-
-        contact.normal      = normal;
-        contact.penetration = sumR - dist;
-        contact.point = {
-            posB.x + normal.x * rB,
-            posB.y + normal.y * rB,
-            posB.z + normal.z * rB
+        c.normal      = Normalize(diff);
+        c.penetration = rSum - dist;
+        c.point       = {
+            posB.x + c.normal.x * rB,
+            posB.y + c.normal.y * rB,
+            posB.z + c.normal.z * rB
         };
         return true;
     }
 
     bool PhysicsWorld::TestSphereBox(
-        RigidBody& sphere, RigidBody& box,
-        ContactPoint& contact
+        RigidBody& sphere, RigidBody& box, ContactPoint& c
     ) {
-        Vec3 spherePos = sphere.GetPosition();
-        Vec3 boxPos    = box.GetPosition();
-        f32  r         = sphere.GetCollider().radius;
-        Vec3 halfExt   = box.GetCollider().halfExtents;
+        Vec3 sp  = sphere.GetPosition();
+        Vec3 bp  = box.GetPosition();
+        f32  r   = sphere.GetCollider().radius;
+        Vec3 he  = box.GetCollider().halfExtents;
 
-        // Find closest point on box to sphere center
-        Vec3 local = {
-            spherePos.x - boxPos.x,
-            spherePos.y - boxPos.y,
-            spherePos.z - boxPos.z
-        };
+        // Vector from box center to sphere center
+        Vec3 local = {sp.x-bp.x, sp.y-bp.y, sp.z-bp.z};
 
-        // Clamp to box
+        // Closest point on box surface to sphere center
         Vec3 closest = {
-            std::max(-halfExt.x, std::min(local.x, halfExt.x)),
-            std::max(-halfExt.y, std::min(local.y, halfExt.y)),
-            std::max(-halfExt.z, std::min(local.z, halfExt.z))
+            std::max(-he.x, std::min(local.x, he.x)),
+            std::max(-he.y, std::min(local.y, he.y)),
+            std::max(-he.z, std::min(local.z, he.z))
         };
 
         Vec3 diff = {
-            local.x - closest.x,
-            local.y - closest.y,
-            local.z - closest.z
+            local.x-closest.x,
+            local.y-closest.y,
+            local.z-closest.z
         };
+        f32 dist = Length(diff);
 
-        f32 distSq = diff.x*diff.x +
-                     diff.y*diff.y +
-                     diff.z*diff.z;
+        if (dist >= r) return false;
 
-        if (distSq >= r * r) return false;
-
-        f32 dist = std::sqrt(distSq);
-        Vec3 normal = dist > 0.0001f
-            ? Vec3{diff.x/dist, diff.y/dist, diff.z/dist}
+        c.normal = (dist > 0.0001f)
+            ? Normalize(diff)
             : Vec3{0,1,0};
-
-        contact.normal      = normal;
-        contact.penetration = r - dist;
-        contact.point = {
-            boxPos.x + closest.x,
-            boxPos.y + closest.y,
-            boxPos.z + closest.z
+        c.penetration = r - dist;
+        c.point = {
+            bp.x+closest.x,
+            bp.y+closest.y,
+            bp.z+closest.z
         };
         return true;
     }
 
     bool PhysicsWorld::TestBoxBox(
-        RigidBody& a, RigidBody& b,
-        ContactPoint& contact
+        RigidBody& a, RigidBody& b, ContactPoint& c
     ) {
-        Vec3 posA  = a.GetPosition();
-        Vec3 posB  = b.GetPosition();
-        Vec3 heA   = a.GetCollider().halfExtents;
-        Vec3 heB   = b.GetCollider().halfExtents;
+        Vec3 posA = a.GetPosition();
+        Vec3 posB = b.GetPosition();
+        Vec3 heA  = a.GetCollider().halfExtents;
+        Vec3 heB  = b.GetCollider().halfExtents;
 
-        // AABB overlap test on each axis
         f32 dx = posA.x - posB.x;
         f32 dy = posA.y - posB.y;
         f32 dz = posA.z - posB.z;
 
-        f32 overlapX = (heA.x + heB.x) - std::abs(dx);
-        f32 overlapY = (heA.y + heB.y) - std::abs(dy);
-        f32 overlapZ = (heA.z + heB.z) - std::abs(dz);
+        f32 ox = (heA.x + heB.x) - std::abs(dx);
+        f32 oy = (heA.y + heB.y) - std::abs(dy);
+        f32 oz = (heA.z + heB.z) - std::abs(dz);
 
-        if (overlapX <= 0 || overlapY <= 0 ||
-            overlapZ <= 0) return false;
+        if (ox <= 0 || oy <= 0 || oz <= 0) return false;
 
-        // Minimum penetration axis
-        if (overlapX < overlapY && overlapX < overlapZ) {
-            contact.normal = {dx < 0 ? -1.0f : 1.0f, 0, 0};
-            contact.penetration = overlapX;
-        } else if (overlapY < overlapZ) {
-            contact.normal = {0, dy < 0 ? -1.0f : 1.0f, 0};
-            contact.penetration = overlapY;
+        if (ox < oy && ox < oz) {
+            c.normal      = {dx < 0 ? -1.0f : 1.0f, 0, 0};
+            c.penetration = ox;
+        } else if (oy < oz) {
+            c.normal      = {0, dy < 0 ? -1.0f : 1.0f, 0};
+            c.penetration = oy;
         } else {
-            contact.normal = {0, 0, dz < 0 ? -1.0f : 1.0f};
-            contact.penetration = overlapZ;
+            c.normal      = {0, 0, dz < 0 ? -1.0f : 1.0f};
+            c.penetration = oz;
         }
 
-        contact.point = {
+        c.point = {
             (posA.x + posB.x) * 0.5f,
             (posA.y + posB.y) * 0.5f,
             (posA.z + posB.z) * 0.5f
@@ -374,218 +365,172 @@ namespace RiftCore {
 
     bool PhysicsWorld::TestSpherePlane(
         RigidBody& sphere, RigidBody& plane,
-        ContactPoint& contact
+        ContactPoint& c
     ) {
         Vec3 pos    = sphere.GetPosition();
         f32  r      = sphere.GetCollider().radius;
-        Vec3 normal = plane.GetCollider().planeNormal;
+        Vec3 n      = plane.GetCollider().planeNormal;
         f32  offset = plane.GetCollider().planeOffset;
 
-        // Signed distance: positive = above plane
-        // normal = (0,1,0), offset = planeY
-        // dist = dot(pos, normal) - offset
-        //      = pos.y - planeY
-        f32 dist = Dot(pos, normal) - offset;
+        // Signed distance from sphere center to plane
+        // positive = sphere is on the normal side (above)
+        f32 dist = Dot(pos, n) - offset;
 
-        // Collision only if sphere is touching or below plane
-        if (dist >= r) return false;
+        // No collision if sphere is entirely above plane
+        if (dist > r) return false;
 
-        // Contact normal points from plane toward sphere
-        contact.normal      = normal;
-        contact.penetration = r - dist;
-
-        // Contact point on plane surface
-        contact.point = {
-            pos.x - normal.x * r,
-            pos.y - normal.y * r,
-            pos.z - normal.z * r
+        // Collision — sphere penetrates plane
+        c.normal      = n;            // push sphere upward
+        c.penetration = r - dist;     // how deep
+        c.point       = {             // contact on plane
+            pos.x - n.x * r,
+            pos.y - n.y * r,
+            pos.z - n.z * r
         };
         return true;
     }
 
     bool PhysicsWorld::TestBoxPlane(
         RigidBody& box, RigidBody& plane,
-        ContactPoint& contact
+        ContactPoint& c
     ) {
         Vec3 pos    = box.GetPosition();
         Vec3 he     = box.GetCollider().halfExtents;
-        Vec3 normal = plane.GetCollider().planeNormal;
+        Vec3 n      = plane.GetCollider().planeNormal;
         f32  offset = plane.GetCollider().planeOffset;
 
-        // For axis-aligned box: project half extents onto normal
-        // normal=(0,1,0): proj = he.y
-        f32 proj = std::abs(he.x * normal.x) +
-                   std::abs(he.y * normal.y) +
-                   std::abs(he.z * normal.z);
+        // For axis-aligned box:
+        // effective radius = projection of half-extents
+        // onto plane normal
+        f32 proj = std::abs(he.x * n.x) +
+                   std::abs(he.y * n.y) +
+                   std::abs(he.z * n.z);
 
-        // dist = signed distance from box center to plane
-        // positive = above plane
-        f32 dist = Dot(pos, normal) - offset;
+        // Signed distance from box center to plane
+        f32 dist = Dot(pos, n) - offset;
 
-        // Bottom of box is at dist - proj from plane
-        // Collision if bottom is below plane surface
-        if (dist >= proj) return false;
+        // No collision if box is entirely above plane
+        if (dist > proj) return false;
 
-        contact.normal      = normal;
-        contact.penetration = proj - dist;
-
-        // Contact point at bottom of box
-        contact.point = {
-            pos.x - normal.x * proj,
-            pos.y - normal.y * proj,
-            pos.z - normal.z * proj
+        c.normal      = n;
+        c.penetration = proj - dist;
+        c.point = {
+            pos.x - n.x * proj,
+            pos.y - n.y * proj,
+            pos.z - n.z * proj
         };
         return true;
     }
 
-    void PhysicsWorld::ResolveContacts(
-        std::vector<ContactPoint>& contacts
-    ) {
-        for (auto& contact : contacts) {
-            ResolveContact(contact);
-            PositionalCorrect(contact);
-        }
-    }
+    // ── Velocity resolution ───────────────────────────────────
+    void PhysicsWorld::ResolveVelocity(ContactPoint& c) {
+        RigidBody& bodyA = bodies_[c.bodyA];
+        RigidBody& bodyB = bodies_[c.bodyB];
 
-    void PhysicsWorld::ResolveContact(ContactPoint& contact) {
-        RigidBody& bodyA = *(&bodies_[contact.bodyA]);
-        RigidBody& bodyB = *(&bodies_[contact.bodyB]);
+        Vec3 vA = bodyA.GetVelocity();
+        Vec3 vB = bodyB.GetVelocity();
 
-        // Relative velocity along normal
-        Vec3 velA = bodyA.GetVelocity();
-        Vec3 velB = bodyB.GetVelocity();
+        // Relative velocity along contact normal
+        Vec3 relVel = {vA.x-vB.x, vA.y-vB.y, vA.z-vB.z};
+        f32  vn     = Dot(relVel, c.normal);
 
-        Vec3 relVel = {
-            velA.x - velB.x,
-            velA.y - velB.y,
-            velA.z - velB.z
-        };
+        // Only resolve if bodies are approaching
+        if (vn > 0.0f) return;
 
-        f32 velAlongNormal = Dot(relVel, contact.normal);
-
-        // Only resolve if moving toward each other
-        if (velAlongNormal > 0) return;
-
-        // Restitution (bounciness)
+        // Coefficient of restitution
         f32 e = std::min(
             bodyA.GetCollider().restitution,
-            bodyB.GetCollider().restitution
-        );
+            bodyB.GetCollider().restitution);
 
-        // Impulse scalar
-        f32 invMassA = bodyA.GetInvMass();
-        f32 invMassB = bodyB.GetInvMass();
-        f32 invMassSum = invMassA + invMassB;
+        f32 iMA = bodyA.GetInvMass();
+        f32 iMB = bodyB.GetInvMass();
+        f32 iMSum = iMA + iMB;
 
-        if (invMassSum < 0.0001f) return;
+        if (iMSum < 0.00001f) return;
 
-        f32 j = -(1.0f + e) * velAlongNormal / invMassSum;
-
-        Vec3 impulse = {
-            contact.normal.x * j,
-            contact.normal.y * j,
-            contact.normal.z * j
-        };
+        // Impulse magnitude
+        f32 j = -(1.0f + e) * vn / iMSum;
 
         // Apply impulse
+        Vec3 impulse = {
+            c.normal.x * j,
+            c.normal.y * j,
+            c.normal.z * j
+        };
         bodyA.ApplyImpulse(impulse);
-        Vec3 negImpulse = {
-            -impulse.x, -impulse.y, -impulse.z};
-        bodyB.ApplyImpulse(negImpulse);
+        Vec3 negI = {-impulse.x,-impulse.y,-impulse.z};
+        bodyB.ApplyImpulse(negI);
 
-        // Friction impulse
-        Vec3 relVelNew = {
-            bodyA.GetVelocity().x - bodyB.GetVelocity().x,
-            bodyA.GetVelocity().y - bodyB.GetVelocity().y,
-            bodyA.GetVelocity().z - bodyB.GetVelocity().z
+        // Friction
+        Vec3 vAn = bodyA.GetVelocity();
+        Vec3 vBn = bodyB.GetVelocity();
+        Vec3 rv2 = {vAn.x-vBn.x, vAn.y-vBn.y,
+                    vAn.z-vBn.z};
+
+        f32  rvn  = Dot(rv2, c.normal);
+        Vec3 tang = {
+            rv2.x - c.normal.x * rvn,
+            rv2.y - c.normal.y * rvn,
+            rv2.z - c.normal.z * rvn
         };
 
-        Vec3 tangent = {
-            relVelNew.x - contact.normal.x *
-                Dot(relVelNew, contact.normal),
-            relVelNew.y - contact.normal.y *
-                Dot(relVelNew, contact.normal),
-            relVelNew.z - contact.normal.z *
-                Dot(relVelNew, contact.normal)
-        };
+        f32 tLen = Length(tang);
+        if (tLen < 0.0001f) return;
 
-        f32 tangentLen = Length(tangent);
-        if (tangentLen > 0.0001f) {
-            tangent.x /= tangentLen;
-            tangent.y /= tangentLen;
-            tangent.z /= tangentLen;
-        } else {
-            return;
-        }
+        tang.x /= tLen;
+        tang.y /= tLen;
+        tang.z /= tLen;
 
-        f32 jt = -Dot(relVelNew, tangent) / invMassSum;
-        f32 mu = (bodyA.GetCollider().friction +
-                  bodyB.GetCollider().friction) * 0.5f;
+        f32 jt  = -Dot(rv2, tang) / iMSum;
+        f32 mu  = (bodyA.GetCollider().friction +
+                   bodyB.GetCollider().friction) * 0.5f;
+        f32 jMax = std::abs(j) * mu;
+        if (jt >  jMax) jt =  jMax;
+        if (jt < -jMax) jt = -jMax;
 
-        Vec3 frictionImpulse;
-        if (std::abs(jt) < j * mu) {
-            frictionImpulse = {
-                tangent.x * jt,
-                tangent.y * jt,
-                tangent.z * jt
-            };
-        } else {
-            frictionImpulse = {
-                tangent.x * -j * mu,
-                tangent.y * -j * mu,
-                tangent.z * -j * mu
-            };
-        }
-
-        bodyA.ApplyImpulse(frictionImpulse);
-        Vec3 negFriction = {
-            -frictionImpulse.x,
-            -frictionImpulse.y,
-            -frictionImpulse.z
-        };
-        bodyB.ApplyImpulse(negFriction);
+        Vec3 fImpulse = {tang.x*jt, tang.y*jt, tang.z*jt};
+        bodyA.ApplyImpulse(fImpulse);
+        Vec3 nfI = {-fImpulse.x,-fImpulse.y,-fImpulse.z};
+        bodyB.ApplyImpulse(nfI);
     }
 
-    void PhysicsWorld::PositionalCorrect(
-        ContactPoint& contact
-    ) {
-        // Baumgarte stabilization — prevents sinking
-        const f32 percent  = 0.6f;  // correction factor
-        const f32 slop     = 0.005f; // penetration tolerance
+    // ── Positional correction ─────────────────────────────────
+    void PhysicsWorld::PositionalCorrect(ContactPoint& c) {
+        RigidBody& bodyA = bodies_[c.bodyA];
+        RigidBody& bodyB = bodies_[c.bodyB];
 
-        RigidBody& bodyA = *(&bodies_[contact.bodyA]);
-        RigidBody& bodyB = *(&bodies_[contact.bodyB]);
+        f32 iMA   = bodyA.GetInvMass();
+        f32 iMB   = bodyB.GetInvMass();
+        f32 iMSum = iMA + iMB;
+        if (iMSum < 0.00001f) return;
 
-        f32 invMassA   = bodyA.GetInvMass();
-        f32 invMassB   = bodyB.GetInvMass();
-        f32 invMassSum = invMassA + invMassB;
+        // Baumgarte stabilization
+        const f32 percent  = 0.8f;   // correction strength
+        const f32 slop     = 0.002f; // tiny gap tolerance
 
-        if (invMassSum < 0.0001f) return;
-
-        f32 corrMag = std::max(
-            contact.penetration - slop, 0.0f)
-            / invMassSum * percent;
+        f32 corr = std::max(c.penetration - slop, 0.0f)
+                   / iMSum * percent;
 
         Vec3 correction = {
-            contact.normal.x * corrMag,
-            contact.normal.y * corrMag,
-            contact.normal.z * corrMag
+            c.normal.x * corr,
+            c.normal.y * corr,
+            c.normal.z * corr
         };
 
-        // Move bodies apart proportionally to inverse mass
         Vec3 posA = bodyA.GetPosition();
-        posA.x += correction.x * invMassA;
-        posA.y += correction.y * invMassA;
-        posA.z += correction.z * invMassA;
+        posA.x += correction.x * iMA;
+        posA.y += correction.y * iMA;
+        posA.z += correction.z * iMA;
         bodyA.SetPosition(posA);
 
         Vec3 posB = bodyB.GetPosition();
-        posB.x -= correction.x * invMassB;
-        posB.y -= correction.y * invMassB;
-        posB.z -= correction.z * invMassB;
+        posB.x -= correction.x * iMB;
+        posB.y -= correction.y * iMB;
+        posB.z -= correction.z * iMB;
         bodyB.SetPosition(posB);
     }
 
+    // ── Raycast ───────────────────────────────────────────────
     RaycastResult PhysicsWorld::Raycast(
         const Vec3& origin,
         const Vec3& direction,
@@ -593,90 +538,42 @@ namespace RiftCore {
     ) const {
         RaycastResult best;
         best.distance = maxDistance;
-
-        Vec3 dir = Normalize(direction);
+        Vec3 dir      = Normalize(direction);
 
         for (u32 i = 0;
              i < static_cast<u32>(bodies_.size()); i++) {
             const RigidBody& body = bodies_[i];
-            if (body.GetCollider().shape ==
-                ColliderShape::Plane) continue;
+            ColliderShape shape   =
+                body.GetCollider().shape;
 
-            if (body.GetCollider().shape ==
-                ColliderShape::Sphere) {
+            if (shape == ColliderShape::Plane) continue;
+
+            if (shape == ColliderShape::Sphere) {
                 Vec3 pos = body.GetPosition();
                 f32  r   = body.GetCollider().radius;
-
-                Vec3 oc = {
-                    origin.x - pos.x,
-                    origin.y - pos.y,
-                    origin.z - pos.z
-                };
-
-                f32 a = Dot(dir, dir);
-                f32 b = 2.0f * Dot(oc, dir);
-                f32 c = Dot(oc, oc) - r * r;
-                f32 disc = b*b - 4*a*c;
-
+                Vec3 oc  = {origin.x-pos.x,
+                             origin.y-pos.y,
+                             origin.z-pos.z};
+                f32 b2 = 2.0f * Dot(oc, dir);
+                f32 c2 = Dot(oc,oc) - r*r;
+                f32 disc = b2*b2 - 4.0f*c2;
                 if (disc >= 0) {
-                    f32 t = (-b - std::sqrt(disc)) / (2*a);
+                    f32 t = (-b2 - std::sqrt(disc))*0.5f;
                     if (t > 0 && t < best.distance) {
-                        best.hit      = true;
-                        best.distance = t;
+                        best.hit       = true;
+                        best.distance  = t;
                         best.bodyIndex = i;
                         best.point = {
-                            origin.x + dir.x * t,
-                            origin.y + dir.y * t,
-                            origin.z + dir.z * t
+                            origin.x+dir.x*t,
+                            origin.y+dir.y*t,
+                            origin.z+dir.z*t
                         };
                         best.normal = Normalize({
-                            best.point.x - pos.x,
-                            best.point.y - pos.y,
-                            best.point.z - pos.z
+                            best.point.x-pos.x,
+                            best.point.y-pos.y,
+                            best.point.z-pos.z
                         });
                     }
-                }
-            }
-            else if (body.GetCollider().shape ==
-                     ColliderShape::Box) {
-                Vec3 pos = body.GetPosition();
-                Vec3 he  = body.GetCollider().halfExtents;
-
-                Vec3 tMin = {
-                    (pos.x-he.x - origin.x) /
-                        (dir.x == 0 ? 1e-8f : dir.x),
-                    (pos.y-he.y - origin.y) /
-                        (dir.y == 0 ? 1e-8f : dir.y),
-                    (pos.z-he.z - origin.z) /
-                        (dir.z == 0 ? 1e-8f : dir.z)
-                };
-                Vec3 tMax = {
-                    (pos.x+he.x - origin.x) /
-                        (dir.x == 0 ? 1e-8f : dir.x),
-                    (pos.y+he.y - origin.y) /
-                        (dir.y == 0 ? 1e-8f : dir.y),
-                    (pos.z+he.z - origin.z) /
-                        (dir.z == 0 ? 1e-8f : dir.z)
-                };
-
-                if (tMin.x > tMax.x) std::swap(tMin.x, tMax.x);
-                if (tMin.y > tMax.y) std::swap(tMin.y, tMax.y);
-                if (tMin.z > tMax.z) std::swap(tMin.z, tMax.z);
-
-                f32 tEnter = std::max({tMin.x,tMin.y,tMin.z});
-                f32 tExit  = std::min({tMax.x,tMax.y,tMax.z});
-
-                if (tEnter < tExit && tEnter > 0 &&
-                    tEnter < best.distance) {
-                    best.hit       = true;
-                    best.distance  = tEnter;
-                    best.bodyIndex = i;
-                    best.point = {
-                        origin.x + dir.x * tEnter,
-                        origin.y + dir.y * tEnter,
-                        origin.z + dir.z * tEnter
-                    };
-                    best.normal = {0, 1, 0};
                 }
             }
         }
@@ -690,8 +587,9 @@ namespace RiftCore {
     VoidResult PhysicsSystemImpl::Initialize() {
         world_ = std::make_unique<PhysicsWorld>();
         world_->SetGravity({0, -9.81f, 0});
-        std::cout << "[Physics] World initialized. "
-                  << "Gravity: (0, -9.81, 0)\n";
+        std::cout
+            << "[Physics] World ready. "
+            << "Gravity=(0,-9.81,0)\n";
         return VoidResult::Ok();
     }
 
@@ -713,12 +611,12 @@ namespace RiftCore {
     }
 
     void PhysicsSystemImpl::AddRigidBody(
-        EntityID e, const RigidBodyDesc& desc
+        EntityID e, const RigidBodyDesc& d
     ) {
         if (!world_) return;
-        u32 bodyId = world_->AddBody(desc);
-        entityToBody_[e] = bodyId;
-        bodyToEntity_[bodyId] = e;
+        u32 id = world_->AddBody(d);
+        entityToBody_[e]  = id;
+        bodyToEntity_[id] = e;
     }
 
     void PhysicsSystemImpl::RemoveRigidBody(EntityID e) {
@@ -734,15 +632,15 @@ namespace RiftCore {
     ) {
         auto it = entityToBody_.find(e);
         if (it == entityToBody_.end()) return;
-        auto* body = world_->GetBody(it->second);
-        if (body) body->SetVelocity(v);
+        auto* b = world_->GetBody(it->second);
+        if (b) b->SetVelocity(v);
     }
 
     Vec3 PhysicsSystemImpl::GetVelocity(EntityID e) const {
         auto it = entityToBody_.find(e);
         if (it == entityToBody_.end()) return Vec3::Zero();
-        auto* body = world_->GetBody(it->second);
-        return body ? body->GetVelocity() : Vec3::Zero();
+        auto* b = world_->GetBody(it->second);
+        return b ? b->GetVelocity() : Vec3::Zero();
     }
 
     void PhysicsSystemImpl::ApplyForce(
@@ -750,8 +648,8 @@ namespace RiftCore {
     ) {
         auto it = entityToBody_.find(e);
         if (it == entityToBody_.end()) return;
-        auto* body = world_->GetBody(it->second);
-        if (body) body->ApplyForce(f);
+        auto* b = world_->GetBody(it->second);
+        if (b) b->ApplyForce(f);
     }
 
     void PhysicsSystemImpl::ApplyImpulse(
@@ -759,23 +657,20 @@ namespace RiftCore {
     ) {
         auto it = entityToBody_.find(e);
         if (it == entityToBody_.end()) return;
-        auto* body = world_->GetBody(it->second);
-        if (body) body->ApplyImpulse(impulse);
+        auto* b = world_->GetBody(it->second);
+        if (b) b->ApplyImpulse(impulse);
     }
 
     RaycastHit PhysicsSystemImpl::Raycast(
-        const Vec3& origin,
-        const Vec3& direction,
-        f32         maxDist
+        const Vec3& o, const Vec3& d, f32 dist
     ) const {
         RaycastHit hit;
         if (!world_) return hit;
-        auto result = world_->Raycast(
-            origin, direction, maxDist);
-        hit.hit      = result.hit;
-        hit.distance = result.distance;
-        hit.point    = result.point;
-        hit.normal   = result.normal;
+        auto r    = world_->Raycast(o, d, dist);
+        hit.hit      = r.hit;
+        hit.distance = r.distance;
+        hit.point    = r.point;
+        hit.normal   = r.normal;
         return hit;
     }
 
@@ -793,9 +688,10 @@ namespace RiftCore {
 
     Vec3 PhysicsSystemImpl::GetBodyPosition(u32 id) const {
         if (!world_) return Vec3::Zero();
-        auto* it = const_cast<PhysicsWorld*>(
-            world_.get())->GetBody(id);
-        return it ? it->GetPosition() : Vec3::Zero();
+        RigidBody* b =
+            const_cast<PhysicsWorld*>(world_.get())
+            ->GetBody(id);
+        return b ? b->GetPosition() : Vec3::Zero();
     }
 
     // ── PhysicsModule ─────────────────────────────────────────
@@ -805,12 +701,10 @@ namespace RiftCore {
     VoidResult PhysicsModule::Initialize(
         const ModuleInitParams& params
     ) {
-        ILogger* logger = nullptr;
-        if (params.context) {
-            logger = params.context->Logger();
-        }
+        ILogger* log = nullptr;
+        if (params.context) log = params.context->Logger();
 
-        if (logger) logger->Info("Physics", "Initializing...");
+        if (log) log->Info("Physics","Initializing...");
 
         physics_ = std::make_unique<PhysicsSystemImpl>();
         auto r   = physics_->Initialize();
@@ -821,11 +715,8 @@ namespace RiftCore {
                 physics_.get());
         }
 
-        if (logger) {
-            logger->Info("Physics",
-                "Physics world ready. "
-                "Fixed step: 1/60s  SubSteps: 4");
-        }
+        if (log) log->Info("Physics",
+            "Ready. Fixed step=1/120  SubSteps=8");
 
         return VoidResult::Ok();
     }
@@ -836,8 +727,8 @@ namespace RiftCore {
         // Fixed timestep accumulator
         accumulator_ += deltaTime;
 
-        // Clamp to prevent spiral of death
-        if (accumulator_ > 0.2f) accumulator_ = 0.2f;
+        // Clamp to avoid spiral of death
+        if (accumulator_ > 0.1f) accumulator_ = 0.1f;
 
         while (accumulator_ >= fixedStep_) {
             physics_->StepSimulation(fixedStep_);
@@ -857,25 +748,14 @@ namespace RiftCore {
     }
 
     ModuleDescriptor PhysicsModule::GetDescriptor() const {
-        ModuleDescriptor desc;
-        desc.name        = "Physics";
-        desc.version     = "0.1.0";
-        desc.apiVersion  = RIFTCORE_API_VERSION;
-        desc.description = "Rigid body physics simulation";
-        return desc;
+        ModuleDescriptor d;
+        d.name        = "Physics";
+        d.version     = "0.1.0";
+        d.apiVersion  = RIFTCORE_API_VERSION;
+        d.description = "Rigid body physics";
+        return d;
     }
 
     RIFTCORE_IMPLEMENT_MODULE(PhysicsModule)
 
 } // namespace RiftCore
-
-
-
-
-
-
-
-
-
-
-

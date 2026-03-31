@@ -13,6 +13,7 @@ target_link_libraries(RiftCoreRuntime
     PRIVATE RiftCore_Input
     PRIVATE RiftCore_Renderer
     PRIVATE RiftCore_Physics
+    PRIVATE RiftCore_Scene
 )
 
 target_include_directories(RiftCoreRuntime
@@ -22,6 +23,7 @@ target_include_directories(RiftCoreRuntime
         ${CMAKE_SOURCE_DIR}/Modules/Input/include
         ${CMAKE_SOURCE_DIR}/Modules/Renderer/include
         ${CMAKE_SOURCE_DIR}/Modules/Physics/include
+        ${CMAKE_SOURCE_DIR}/Modules/Scene/include
 )
 
 find_package(glad   CONFIG REQUIRED)

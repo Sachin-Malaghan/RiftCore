@@ -1,0 +1,231 @@
+{
+    "nodes": [
+        {
+            "active": true,
+            "id": 1,
+            "mesh": {
+                "albedo": [
+                    0.4000000059604645,
+                    0.699999988079071,
+                    0.4000000059604645
+                ],
+                "material": "ground",
+                "metallic": 0.0,
+                "path": "",
+                "roughness": 0.8999999761581421
+            },
+            "name": "Ground",
+            "parentID": 0,
+            "physics": {
+                "friction": 0.6000000238418579,
+                "halfExtents": [
+                    15.0,
+                    0.10000000149011612,
+                    15.0
+                ],
+                "isStatic": true,
+                "mass": 0.0,
+                "radius": 0.5,
+                "restitution": 0.5,
+                "shape": "plane"
+            },
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "active": true,
+            "id": 2,
+            "mesh": {
+                "albedo": [
+                    0.6000000238418579,
+                    0.6000000238418579,
+                    0.6000000238418579
+                ],
+                "material": "stone",
+                "metallic": 0.30000001192092896,
+                "path": "",
+                "roughness": 0.5
+            },
+            "name": "Platform",
+            "parentID": 0,
+            "physics": {
+                "friction": 0.5,
+                "halfExtents": [
+                    3.0,
+                    0.30000001192092896,
+                    3.0
+                ],
+                "isStatic": true,
+                "mass": 0.0,
+                "radius": 0.5,
+                "restitution": 0.4000000059604645,
+                "shape": "box"
+            },
+            "position": [
+                0.0,
+                4.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "active": true,
+            "id": 3,
+            "mesh": {
+                "albedo": [
+                    0.8999999761581421,
+                    0.20000000298023224,
+                    0.20000000298023224
+                ],
+                "material": "red",
+                "metallic": 0.30000001192092896,
+                "path": "",
+                "roughness": 0.4000000059604645
+            },
+            "name": "RedSphere",
+            "parentID": 0,
+            "physics": {
+                "friction": 0.5,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isStatic": false,
+                "mass": 1.0,
+                "radius": 0.5,
+                "restitution": 0.699999988079071,
+                "shape": "sphere"
+            },
+            "position": [
+                -2.0,
+                10.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "active": true,
+            "id": 4,
+            "mesh": {
+                "albedo": [
+                    0.8999999761581421,
+                    0.699999988079071,
+                    0.20000000298023224
+                ],
+                "material": "gold",
+                "metallic": 0.800000011920929,
+                "path": "",
+                "roughness": 0.20000000298023224
+            },
+            "name": "GoldBox",
+            "parentID": 0,
+            "physics": {
+                "friction": 0.6000000238418579,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isStatic": false,
+                "mass": 2.0,
+                "radius": 0.5,
+                "restitution": 0.30000001192092896,
+                "shape": "box"
+            },
+            "position": [
+                2.0,
+                12.0,
+                1.0
+            ],
+            "rotation": [
+                0.0,
+                45.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "active": true,
+            "id": 5,
+            "mesh": {
+                "albedo": [
+                    0.20000000298023224,
+                    0.30000001192092896,
+                    0.8999999761581421
+                ],
+                "material": "blue",
+                "metallic": 0.5,
+                "path": "",
+                "roughness": 0.30000001192092896
+            },
+            "name": "BlueSphere",
+            "parentID": 0,
+            "physics": {
+                "friction": 0.4000000059604645,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isStatic": false,
+                "mass": 1.5,
+                "radius": 0.5,
+                "restitution": 0.6000000238418579,
+                "shape": "sphere"
+            },
+            "position": [
+                0.0,
+                8.0,
+                -2.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    ],
+    "scene": "TestLevel",
+    "version": "1.0"
+}
