@@ -39,6 +39,7 @@ namespace RiftCore {
 
         u32  AddBody(const RigidBodyDesc& desc);
         void RemoveBody(u32 id);
+        void ClearAllBodies();
         RigidBody* GetBody(u32 id);
 
         u32 AddGroundPlane(f32 y = 0.0f,
@@ -122,6 +123,7 @@ namespace RiftCore {
         PhysicsWorld* GetWorld()  { return world_.get(); }
         u32           AddBody    (const RigidBodyDesc& d);
         void          RemoveBody (u32 id);
+        void       ClearAllBodies   ();
         RigidBody*    GetBody    (u32 id);
         Vec3          GetBodyPosition(u32 id) const;
 
@@ -158,3 +160,6 @@ namespace RiftCore {
 } // namespace RiftCore
 
 #pragma warning(pop)
+
+
+

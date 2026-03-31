@@ -276,6 +276,13 @@ int main()
                 physics->GetWorld()->AddGroundPlane(
                     0.0f, 0.6f, 0.6f);
 
+                // Clear ALL physics first
+                physics->ClearAllBodies();
+                physics->GetWorld()->AddGroundPlane(
+                    0.0f, 0.6f, 0.6f);
+
+                 physics->ClearAllBodies();
+                 physics->GetWorld()->AddGroundPlane(0.0f, 0.6f, 0.6f);
                 auto r = scene->LoadScene(scenePath);
                 if (r.IsOk()) {
                     logger->Info("Main",
@@ -295,6 +302,11 @@ int main()
                 // Re-add ground plane after clear
                 physics->GetWorld()->AddGroundPlane(
                     0.0f, 0.6f, 0.6f);
+                physics->ClearAllBodies();
+                physics->GetWorld()->AddGroundPlane(
+                    0.0f, 0.6f, 0.6f);
+                 physics->ClearAllBodies();
+                 physics->GetWorld()->AddGroundPlane(0.0f, 0.6f, 0.6f);
                 scene->NewScene("NewScene");
                 logger->Info("Main",
                     "New empty scene created");
@@ -478,5 +490,8 @@ int main()
     engine.Shutdown();
     return 0;
 }
+
+
+
 
 

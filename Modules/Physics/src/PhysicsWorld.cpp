@@ -70,6 +70,14 @@ namespace RiftCore {
         idToIndex_.erase(id);
     }
 
+    void PhysicsWorld::ClearAllBodies() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        bodies_.clear();
+        idToIndex_.clear();
+        nextID_ = 1;
+        std::cout << "[PhysicsWorld] All bodies cleared.\n";
+    }
+
     RigidBody* PhysicsWorld::GetBody(u32 id) {
         auto it = idToIndex_.find(id);
         if (it == idToIndex_.end()) return nullptr;
@@ -598,6 +606,7 @@ namespace RiftCore {
         std::cout << "[Physics] Shutdown.\n";
     }
 
+
     void PhysicsSystemImpl::StepSimulation(f32 dt) {
         if (world_) world_->Step(dt);
     }
@@ -672,6 +681,14 @@ namespace RiftCore {
         hit.point    = r.point;
         hit.normal   = r.normal;
         return hit;
+    }
+
+    void PhysicsSystemImpl::ClearAllBodies() {
+        if (!world_) return;
+        world_->ClearAllBodies();
+        entityToBody_.clear();
+        bodyToEntity_.clear();
+        std::cout << "[Physics] All bodies cleared.\n";
     }
 
     u32 PhysicsSystemImpl::AddBody(const RigidBodyDesc& d) {
@@ -759,3 +776,6 @@ namespace RiftCore {
     RIFTCORE_IMPLEMENT_MODULE(PhysicsModule)
 
 } // namespace RiftCore
+
+
+
