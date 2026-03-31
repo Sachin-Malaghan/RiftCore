@@ -1,0 +1,18 @@
+﻿# Auto detect text files and normalize line endings
+* text=auto
+
+# Explicitly declare text files
+*.cpp    text eol=crlf
+*.h      text eol=crlf
+*.cmake  text eol=crlf
+*.txt    text eol=crlf
+*.md     text eol=crlf
+*.json   text eol=crlf
+
+# Binary files - no line ending conversion
+*.dll    binary
+*.lib    binary
+*.exe    binary
+*.png    binary
+*.jpg    binary
+*.obj    binary
