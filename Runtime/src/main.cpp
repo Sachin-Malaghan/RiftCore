@@ -271,6 +271,11 @@ int main()
             // L = Load scene
             if (loadKey.Pressed(
                     input->IsKeyDown(Key::L))) {
+                // Re-add ground plane first
+                // (ClearScene removes all physics bodies)
+                physics->GetWorld()->AddGroundPlane(
+                    0.0f, 0.6f, 0.6f);
+
                 auto r = scene->LoadScene(scenePath);
                 if (r.IsOk()) {
                     logger->Info("Main",
@@ -287,6 +292,9 @@ int main()
             // N = New empty scene
             if (newKey.Pressed(
                     input->IsKeyDown(Key::N))) {
+                // Re-add ground plane after clear
+                physics->GetWorld()->AddGroundPlane(
+                    0.0f, 0.6f, 0.6f);
                 scene->NewScene("NewScene");
                 logger->Info("Main",
                     "New empty scene created");
@@ -470,3 +478,4 @@ int main()
     engine.Shutdown();
     return 0;
 }
+

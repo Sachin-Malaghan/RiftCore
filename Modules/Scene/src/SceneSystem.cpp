@@ -82,20 +82,22 @@ namespace RiftCore {
     void SceneSystem::ClearScene() {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        // Destroy physics bodies
         if (context_) {
+            // ── Remove all physics bodies ─────────────────
             auto* physics = context_->Get<IPhysics>();
             if (physics) {
                 for (auto& [id, node] : nodes_) {
-                    if (node->hasPhysics &&
-                        node->GetPhysicsBodyID() != 0) {
-                        // Physics cleanup handled by
-                        // physics world destructor
+                    if (node->hasPhysics) {
+                        // Remove via ECS entity ID
+                        EntityID eid = node->GetEntityID();
+                        if (eid != 0) {
+                            physics->RemoveRigidBody(eid);
+                        }
                     }
                 }
             }
 
-            // Destroy audio sources
+            // ── Remove all audio sources ──────────────────
             auto* audio = context_->Get<IAudio>();
             if (audio) {
                 for (auto& [id, node] : nodes_) {
@@ -106,12 +108,27 @@ namespace RiftCore {
                     }
                 }
             }
+
+            // ── Remove all ECS entities ───────────────────
+            auto* ecs = context_->Get<IECS>();
+            if (ecs) {
+                for (auto& [id, node] : nodes_) {
+                    EntityID eid = node->GetEntityID();
+                    if (eid != 0) {
+                        ecs->DestroyEntity(eid);
+                    }
+                }
+            }
         }
 
         nodes_.clear();
         rootNodes_.clear();
         sceneName_     = "";
         sceneFilePath_ = "";
+
+        if (logger_) {
+            logger_->Info("Scene","Scene cleared.");
+        }
     }
 
     SceneInfo SceneSystem::GetSceneInfo() const {
@@ -587,3 +604,4 @@ namespace RiftCore {
     RIFTCORE_IMPLEMENT_MODULE(SceneModule)
 
 } // namespace RiftCore
+
