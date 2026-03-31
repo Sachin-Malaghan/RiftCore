@@ -32,4 +32,17 @@ add_library(nlohmann_json INTERFACE)
 target_include_directories(nlohmann_json INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/json)
 
-message(STATUS "[ThirdParty] stb_image + miniaudio + json configured.")
+# ── ImGuizmo ──────────────────────────────────────────────
+find_package(imgui CONFIG REQUIRED)
+
+add_library(imguizmo STATIC
+    imguizmo/ImGuizmo.cpp
+)
+target_include_directories(imguizmo PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/imguizmo)
+target_link_libraries(imguizmo PUBLIC imgui::imgui)
+if(MSVC)
+    target_compile_options(imguizmo PRIVATE /W0)
+endif()
+
+message(STATUS "[ThirdParty] All libraries configured.")
