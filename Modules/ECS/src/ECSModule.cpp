@@ -1,4 +1,5 @@
-﻿#include <ECS/ECSModule.h>
+#pragma warning(disable: 4190)
+#include <ECS/ECSModule.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
 #include <iostream>

@@ -1,4 +1,5 @@
-﻿#include <Renderer/RenderSystem.h>
+#pragma warning(disable: 4190)
+#include <Renderer/RenderSystem.h>
 #include <OpenGLBackend/GLDevice.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
@@ -10,7 +11,7 @@
 
 namespace RiftCore {
 
-    // ── Shaders ───────────────────────────────────────────────
+    // -- Shaders -----------------------------------------------
     static const char* s_vertSrc = R"(
 #version 460 core
 layout(location = 0) in vec3 aPosition;
@@ -115,7 +116,7 @@ void main() {
 }
 )";
 
-    // ── RenderSystem ──────────────────────────────────────────
+    // -- RenderSystem ------------------------------------------
     RenderSystem::RenderSystem()  = default;
     RenderSystem::~RenderSystem() { Shutdown(); }
 
@@ -480,7 +481,7 @@ void main() {
             enabled ? GL_LINE : GL_FILL);
     }
 
-    // ── RendererModule ────────────────────────────────────────
+    // -- RendererModule ----------------------------------------
     RendererModule::RendererModule()  = default;
     RendererModule::~RendererModule() = default;
 

@@ -1,4 +1,5 @@
-﻿#include <Scene/SceneSystem.h>
+#pragma warning(disable: 4190)
+#include <Scene/SceneSystem.h>
 #include <RiftCore/Core/ILogger.h>
 #include <RiftCore/Physics/IPhysics.h>
 #include <RiftCore/Audio/IAudio.h>
@@ -14,7 +15,7 @@ namespace RiftCore {
 
     using json = nlohmann::json;
 
-    // ── Helpers ───────────────────────────────────────────────
+    // -- Helpers -----------------------------------------------
     static json Vec3ToJson(const Vec3& v) {
         return json::array({v.x, v.y, v.z});
     }
@@ -27,7 +28,7 @@ namespace RiftCore {
                 j[2].get<float>()};
     }
 
-    // ── SceneSystem ───────────────────────────────────────────
+    // -- SceneSystem -------------------------------------------
     SceneSystem::SceneSystem()  = default;
     SceneSystem::~SceneSystem() { Shutdown(); }
 
@@ -67,7 +68,7 @@ namespace RiftCore {
         }
     }
 
-    // ── Scene management ──────────────────────────────────────
+    // -- Scene management --------------------------------------
     VoidResult SceneSystem::NewScene(const String& name) {
         ClearScene();
         sceneName_     = name;
@@ -83,7 +84,7 @@ namespace RiftCore {
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (context_) {
-            // ── Remove all physics bodies ─────────────────
+            // -- Remove all physics bodies -----------------
             auto* physics = context_->Get<IPhysics>();
             if (physics) {
                 for (auto& [id, node] : nodes_) {
@@ -97,7 +98,7 @@ namespace RiftCore {
                 }
             }
 
-            // ── Remove all audio sources ──────────────────
+            // -- Remove all audio sources ------------------
             auto* audio = context_->Get<IAudio>();
             if (audio) {
                 for (auto& [id, node] : nodes_) {
@@ -109,7 +110,7 @@ namespace RiftCore {
                 }
             }
 
-            // ── Remove all ECS entities ───────────────────
+            // -- Remove all ECS entities -------------------
             auto* ecs = context_->Get<IECS>();
             if (ecs) {
                 for (auto& [id, node] : nodes_) {
@@ -140,7 +141,7 @@ namespace RiftCore {
         return info;
     }
 
-    // ── Node management ───────────────────────────────────────
+    // -- Node management ---------------------------------------
     Result<SceneNodeID> SceneSystem::CreateNode(
         const SceneNodeDesc& desc
     ) {
@@ -333,7 +334,7 @@ namespace RiftCore {
         }
     }
 
-    // ── Save scene to JSON ────────────────────────────────────
+    // -- Save scene to JSON ------------------------------------
     VoidResult SceneSystem::SaveScene(const String& path) {
         json root;
         root["scene"]   = sceneName_;
@@ -427,7 +428,7 @@ namespace RiftCore {
         return VoidResult::Ok();
     }
 
-    // ── Load scene from JSON ──────────────────────────────────
+    // -- Load scene from JSON ----------------------------------
     VoidResult SceneSystem::LoadScene(const String& path) {
         std::ifstream file(path);
         if (!file.is_open()) {
@@ -554,7 +555,7 @@ namespace RiftCore {
         return VoidResult::Ok();
     }
 
-    // ── SceneModule ───────────────────────────────────────────
+    // -- SceneModule -------------------------------------------
     SceneModule::SceneModule()  = default;
     SceneModule::~SceneModule() = default;
 

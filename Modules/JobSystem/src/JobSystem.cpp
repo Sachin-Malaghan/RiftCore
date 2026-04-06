@@ -1,4 +1,5 @@
-﻿#include <JobSystem/JobSystem.h>
+#pragma warning(disable: 4190)
+#include <JobSystem/JobSystem.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
 #include <iostream>
@@ -6,7 +7,7 @@
 
 namespace RiftCore {
 
-    // ── JobSystemImpl ─────────────────────────────────────────
+    // -- JobSystemImpl -----------------------------------------
 
     JobSystemImpl::JobSystemImpl()  = default;
     JobSystemImpl::~JobSystemImpl() {
@@ -38,7 +39,7 @@ namespace RiftCore {
         return threadPool_ ? threadPool_->GetPendingCount() : 0;
     }
 
-    // ── JobSystemModule ───────────────────────────────────────
+    // -- JobSystemModule ---------------------------------------
 
     JobSystemModule::JobSystemModule()  = default;
     JobSystemModule::~JobSystemModule() = default;

@@ -40,3 +40,12 @@ set_target_properties(RiftCoreRuntime PROPERTIES
 )
 
 message(STATUS "[App] Runtime registered.")
+
+# Expose the new UI and RHI headers to the Runtime executable
+target_include_directories(RiftCoreRuntime PRIVATE 
+    "${CMAKE_SOURCE_DIR}/Modules/UI/include"
+    "${CMAKE_SOURCE_DIR}/Modules/RHI/include"
+)
+
+# Link the statically compiled Core module so the linker can find the compiled PluginLoader code
+target_link_libraries(RiftCoreRuntime PRIVATE RiftCore_Core)

@@ -1,4 +1,5 @@
-﻿#include <Input/InputSystem.h>
+#pragma warning(disable: 4190)
+#include <Input/InputSystem.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
 #include <RiftCore/RHI/IRHIDevice.h>
@@ -12,7 +13,7 @@
 
 namespace RiftCore {
 
-    // ── GLFW Static Callbacks ─────────────────────────────────
+    // -- GLFW Static Callbacks ---------------------------------
     // GLFW cannot call member functions directly
     // We use glfwSetWindowUserPointer to pass our InputSystem*
     // then cast it back inside the callback
@@ -45,7 +46,7 @@ namespace RiftCore {
         if (sys) sys->OnMouseScroll(xOffset, yOffset);
     }
 
-    // ── InputSystem ───────────────────────────────────────────
+    // -- InputSystem -------------------------------------------
     InputSystem::InputSystem() {
         keyStates_.fill(KeyState::Up);
         mouseStates_.fill(KeyState::Up);
@@ -88,8 +89,8 @@ namespace RiftCore {
         std::lock_guard<std::mutex> lock(mutex_);
 
         // Transition states from frame to frame:
-        // Pressed  → Down     (was just pressed, now held)
-        // Released → Up       (was just released, now up)
+        // Pressed  ? Down     (was just pressed, now held)
+        // Released ? Up       (was just released, now up)
         for (auto& state : keyStates_) {
             if (state == KeyState::Pressed)  state = KeyState::Down;
             if (state == KeyState::Released) state = KeyState::Up;
@@ -110,7 +111,7 @@ namespace RiftCore {
         scrollY_ = 0.0f;
     }
 
-    // ── Keyboard queries ──────────────────────────────────────
+    // -- Keyboard queries --------------------------------------
     bool InputSystem::IsValidKey(Key key) const {
         i32 k = static_cast<i32>(key);
         return k >= 0 && k < KEY_COUNT;
@@ -137,7 +138,7 @@ namespace RiftCore {
                == KeyState::Released;
     }
 
-    // ── Mouse queries ─────────────────────────────────────────
+    // -- Mouse queries -----------------------------------------
     bool InputSystem::IsValidMouseButton(MouseButton btn) const {
         i32 b = static_cast<i32>(btn);
         return b >= 0 && b < MOUSE_COUNT;
@@ -199,7 +200,7 @@ namespace RiftCore {
         return cursorLocked_;
     }
 
-    // ── GLFW Callbacks ────────────────────────────────────────
+    // -- GLFW Callbacks ----------------------------------------
     void InputSystem::OnKey(i32 key, i32 action, i32 mods) {
         RIFTCORE_UNUSED(mods);
         if (key < 0 || key >= KEY_COUNT) return;
@@ -264,7 +265,7 @@ namespace RiftCore {
         scrollY_ += static_cast<f32>(yOffset);
     }
 
-    // ── InputModule ───────────────────────────────────────────
+    // -- InputModule -------------------------------------------
     InputModule::InputModule()  = default;
     InputModule::~InputModule() = default;
 
@@ -282,7 +283,7 @@ namespace RiftCore {
 
         // Get GLFWwindow from the RHI device
         // The OpenGLBackend DLL created the window
-        // We get it through the IRHI → IRHIDevice → GLDevice
+        // We get it through the IRHI ? IRHIDevice ? GLDevice
         GLFWwindow* window = nullptr;
 
         if (params.context) {

@@ -1,4 +1,5 @@
-﻿#include <Audio/AudioSystem.h>
+#pragma warning(disable: 4190)
+#include <Audio/AudioSystem.h>
 
 // Include miniaudio implementation
 // Only include the header here (impl is in miniaudio_impl.cpp)
@@ -13,7 +14,7 @@
 
 namespace RiftCore {
 
-    // ── AudioSystem ───────────────────────────────────────────
+    // -- AudioSystem -------------------------------------------
     AudioSystem::AudioSystem()  = default;
     AudioSystem::~AudioSystem() { Shutdown(); }
 
@@ -95,7 +96,7 @@ namespace RiftCore {
         }
     }
 
-    // ── Clip management ───────────────────────────────────────
+    // -- Clip management ---------------------------------------
     Result<AudioClipID> AudioSystem::LoadClip(
         const AudioClipDesc& desc
     ) {
@@ -160,7 +161,7 @@ namespace RiftCore {
         clips_.clear();
     }
 
-    // ── Source management ─────────────────────────────────────
+    // -- Source management -------------------------------------
     Result<AudioSourceID> AudioSystem::CreateSource(
         const AudioSourceDesc& desc
     ) {
@@ -262,7 +263,7 @@ namespace RiftCore {
         sources_.erase(it);
     }
 
-    // ── Playback ──────────────────────────────────────────────
+    // -- Playback ----------------------------------------------
     void AudioSystem::Play(AudioSourceID id) {
         std::lock_guard<std::mutex> lock(mutex_);
         auto* src = GetSource(id);
@@ -321,7 +322,7 @@ namespace RiftCore {
         }
     }
 
-    // ── Volume + Pitch ────────────────────────────────────────
+    // -- Volume + Pitch ----------------------------------------
     void AudioSystem::SetVolume(AudioSourceID id, f32 vol) {
         std::lock_guard<std::mutex> lock(mutex_);
         auto* src = GetSource(id);
@@ -352,7 +353,7 @@ namespace RiftCore {
         return src ? src->pitch : 1.0f;
     }
 
-    // ── 3D Audio ──────────────────────────────────────────────
+    // -- 3D Audio ----------------------------------------------
     void AudioSystem::SetSourcePosition(
         AudioSourceID id, const Vec3& pos
     ) {
@@ -383,7 +384,7 @@ namespace RiftCore {
             up.x, up.y, up.z);
     }
 
-    // ── Master volume ─────────────────────────────────────────
+    // -- Master volume -----------------------------------------
     void AudioSystem::SetMasterVolume(f32 volume) {
         masterVolume_ = volume;
         if (initialized_) {
@@ -395,7 +396,7 @@ namespace RiftCore {
         return masterVolume_;
     }
 
-    // ── PlayOneShot ───────────────────────────────────────────
+    // -- PlayOneShot -------------------------------------------
     AudioSourceID AudioSystem::PlayOneShot(
         AudioClipID clipID, f32 volume, f32 pitch
     ) {
@@ -420,7 +421,7 @@ namespace RiftCore {
         return srcID;
     }
 
-    // ── Stats ─────────────────────────────────────────────────
+    // -- Stats -------------------------------------------------
     u32 AudioSystem::GetActiveSourceCount() const {
         std::lock_guard<std::mutex> lock(mutex_);
         u32 count = 0;
@@ -438,7 +439,7 @@ namespace RiftCore {
         return static_cast<u32>(clips_.size());
     }
 
-    // ── Private helpers ───────────────────────────────────────
+    // -- Private helpers ---------------------------------------
     AudioClipData* AudioSystem::GetClip(AudioClipID id) {
         auto it = clips_.find(id);
         return it != clips_.end() ? &it->second : nullptr;
@@ -461,7 +462,7 @@ namespace RiftCore {
             : nullptr;
     }
 
-    // ── AudioModule ───────────────────────────────────────────
+    // -- AudioModule -------------------------------------------
     AudioModule::AudioModule()  = default;
     AudioModule::~AudioModule() = default;
 
