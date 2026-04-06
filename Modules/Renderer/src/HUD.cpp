@@ -1,4 +1,4 @@
-﻿#include <Renderer/HUD.h>
+#include <Renderer/HUD.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -27,6 +27,7 @@ namespace RiftCore {
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
+    (void)io; // Suppress warning
         // Do NOT enable keyboard navigation
         // This allows our game to receive ALL key events
         // ImGui will only capture keys when a widget is focused
@@ -36,7 +37,7 @@ namespace RiftCore {
         io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
         RIFTCORE_UNUSED(io);
 
-        // Style — dark theme with custom colors
+        // Style � dark theme with custom colors
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
         style.WindowRounding    = 6.0f;
@@ -145,6 +146,7 @@ namespace RiftCore {
         RIFTCORE_UNUSED(selectedIdx);
         // Top-left corner stats bar
         ImGuiIO& io = ImGui::GetIO();
+    (void)io; // Suppress warning
         ImGui::SetNextWindowPos(
             ImVec2(10, 10), ImGuiCond_Always);
         ImGui::SetNextWindowSize(

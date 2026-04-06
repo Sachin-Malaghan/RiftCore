@@ -1,4 +1,5 @@
-﻿#include <OpenGLBackend/GLDevice.h>
+#pragma warning(disable: 4190)
+#include <OpenGLBackend/GLDevice.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
 #include <RiftCore/Core/IModule.h>

@@ -1,4 +1,5 @@
-﻿#include <Physics/PhysicsWorld.h>
+#pragma warning(disable: 4190)
+#include <Physics/PhysicsWorld.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
 
@@ -9,7 +10,7 @@
 
 namespace RiftCore {
 
-    // ── Math helpers ──────────────────────────────────────────
+    // -- Math helpers ------------------------------------------
     static f32 Dot(const Vec3& a, const Vec3& b) {
         return a.x*b.x + a.y*b.y + a.z*b.z;
     }
@@ -24,7 +25,7 @@ namespace RiftCore {
         return {v.x/len, v.y/len, v.z/len};
     }
 
-    // ── PhysicsWorld ──────────────────────────────────────────
+    // -- PhysicsWorld ------------------------------------------
     PhysicsWorld::PhysicsWorld()  = default;
     PhysicsWorld::~PhysicsWorld() = default;
 
@@ -84,7 +85,7 @@ namespace RiftCore {
         return &bodies_[it->second];
     }
 
-    // ── Main simulation step ──────────────────────────────────
+    // -- Main simulation step ----------------------------------
     void PhysicsWorld::Step(f32 dt) {
         auto t0 = std::chrono::high_resolution_clock::now();
 
@@ -165,7 +166,7 @@ namespace RiftCore {
         }
     }
 
-    // ── BroadPhase ────────────────────────────────────────────
+    // -- BroadPhase --------------------------------------------
     void PhysicsWorld::BroadPhase(
         std::vector<std::pair<u32,u32>>& pairs
     ) {
@@ -192,7 +193,7 @@ namespace RiftCore {
         }
     }
 
-    // ── NarrowPhase ───────────────────────────────────────────
+    // -- NarrowPhase -------------------------------------------
     void PhysicsWorld::NarrowPhase(
         const std::vector<std::pair<u32,u32>>& pairs,
         std::vector<ContactPoint>&              contacts
@@ -222,7 +223,7 @@ namespace RiftCore {
                      sB == ColliderShape::Sphere) {
                 hit = TestSphereBox(bodyB,bodyA,c);
                 if (hit) {
-                    // Flip normal — sphere was B
+                    // Flip normal � sphere was B
                     c.normal.x = -c.normal.x;
                     c.normal.y = -c.normal.y;
                     c.normal.z = -c.normal.z;
@@ -269,7 +270,7 @@ namespace RiftCore {
         }
     }
 
-    // ── Collision tests ───────────────────────────────────────
+    // -- Collision tests ---------------------------------------
     bool PhysicsWorld::TestSphereSphere(
         RigidBody& a, RigidBody& b, ContactPoint& c
     ) {
@@ -387,7 +388,7 @@ namespace RiftCore {
         // No collision if sphere is entirely above plane
         if (dist > r) return false;
 
-        // Collision — sphere penetrates plane
+        // Collision � sphere penetrates plane
         c.normal      = n;            // push sphere upward
         c.penetration = r - dist;     // how deep
         c.point       = {             // contact on plane
@@ -430,7 +431,7 @@ namespace RiftCore {
         return true;
     }
 
-    // ── Velocity resolution ───────────────────────────────────
+    // -- Velocity resolution -----------------------------------
     void PhysicsWorld::ResolveVelocity(ContactPoint& c) {
         RigidBody& bodyA = bodies_[c.bodyA];
         RigidBody& bodyB = bodies_[c.bodyB];
@@ -502,7 +503,7 @@ namespace RiftCore {
         bodyB.ApplyImpulse(nfI);
     }
 
-    // ── Positional correction ─────────────────────────────────
+    // -- Positional correction ---------------------------------
     void PhysicsWorld::PositionalCorrect(ContactPoint& c) {
         RigidBody& bodyA = bodies_[c.bodyA];
         RigidBody& bodyB = bodies_[c.bodyB];
@@ -538,7 +539,7 @@ namespace RiftCore {
         bodyB.SetPosition(posB);
     }
 
-    // ── Raycast ───────────────────────────────────────────────
+    // -- Raycast -----------------------------------------------
     RaycastResult PhysicsWorld::Raycast(
         const Vec3& origin,
         const Vec3& direction,
@@ -588,7 +589,7 @@ namespace RiftCore {
         return best;
     }
 
-    // ── PhysicsSystemImpl ─────────────────────────────────────
+    // -- PhysicsSystemImpl -------------------------------------
     PhysicsSystemImpl::PhysicsSystemImpl()  = default;
     PhysicsSystemImpl::~PhysicsSystemImpl() = default;
 
@@ -711,7 +712,7 @@ namespace RiftCore {
         return b ? b->GetPosition() : Vec3::Zero();
     }
 
-    // ── PhysicsModule ─────────────────────────────────────────
+    // -- PhysicsModule -----------------------------------------
     PhysicsModule::PhysicsModule()  = default;
     PhysicsModule::~PhysicsModule() = default;
 

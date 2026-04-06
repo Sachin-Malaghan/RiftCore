@@ -32,3 +32,7 @@ set_target_properties(RiftCore_Core PROPERTIES
 )
 
 message(STATUS "[Module] Core registered.")
+
+# Explicitly add new bootstrap files to the Core build target
+target_sources(RiftCore_Core PRIVATE src/PluginLoader.cpp)
+
