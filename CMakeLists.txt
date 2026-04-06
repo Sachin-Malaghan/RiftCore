@@ -71,3 +71,7 @@ add_subdirectory(Editor)
 add_subdirectory(Tests)
 
 message(STATUS "[RiftCore] Configuration complete.")
+
+# Automatically set RiftCoreEditor as the highlighted Startup Project in Visual Studio
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT RiftCoreEditor)
+
