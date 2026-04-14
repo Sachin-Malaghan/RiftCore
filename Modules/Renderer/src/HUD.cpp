@@ -27,7 +27,7 @@ namespace RiftCore {
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
-    (void)io; // Suppress warning
+        (void)io; // Suppress warning
         // Do NOT enable keyboard navigation
         // This allows our game to receive ALL key events
         // ImGui will only capture keys when a widget is focused
@@ -37,7 +37,7 @@ namespace RiftCore {
         io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
         RIFTCORE_UNUSED(io);
 
-        // Style � dark theme with custom colors
+        // Style — dark theme with custom colors
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
         style.WindowRounding    = 6.0f;
@@ -50,22 +50,22 @@ namespace RiftCore {
 
         // Custom RiftCore color scheme
         auto* colors = style.Colors;
-        colors[ImGuiCol_WindowBg]     = ImVec4(0.08f,0.08f,0.12f,0.88f);
-        colors[ImGuiCol_TitleBg]      = ImVec4(0.10f,0.10f,0.25f,1.00f);
-        colors[ImGuiCol_TitleBgActive]= ImVec4(0.15f,0.15f,0.40f,1.00f);
-        colors[ImGuiCol_Header]       = ImVec4(0.15f,0.25f,0.45f,0.80f);
-        colors[ImGuiCol_HeaderHovered]= ImVec4(0.20f,0.35f,0.60f,0.90f);
-        colors[ImGuiCol_HeaderActive] = ImVec4(0.25f,0.45f,0.75f,1.00f);
-        colors[ImGuiCol_FrameBg]      = ImVec4(0.12f,0.12f,0.20f,0.80f);
-        colors[ImGuiCol_FrameBgHovered]=ImVec4(0.18f,0.18f,0.30f,0.90f);
-        colors[ImGuiCol_SliderGrab]   = ImVec4(0.30f,0.50f,0.90f,1.00f);
-        colors[ImGuiCol_CheckMark]    = ImVec4(0.40f,0.70f,1.00f,1.00f);
-        colors[ImGuiCol_Button]       = ImVec4(0.15f,0.25f,0.50f,0.80f);
-        colors[ImGuiCol_ButtonHovered]= ImVec4(0.25f,0.40f,0.70f,0.90f);
-        colors[ImGuiCol_ButtonActive] = ImVec4(0.35f,0.55f,0.90f,1.00f);
-        colors[ImGuiCol_Separator]    = ImVec4(0.25f,0.25f,0.45f,0.80f);
-        colors[ImGuiCol_Text]         = ImVec4(0.90f,0.90f,0.95f,1.00f);
-        colors[ImGuiCol_TextDisabled] = ImVec4(0.50f,0.50f,0.60f,1.00f);
+        colors[ImGuiCol_WindowBg]      = ImVec4(0.08f,0.08f,0.12f,0.88f);
+        colors[ImGuiCol_TitleBg]       = ImVec4(0.10f,0.10f,0.25f,1.00f);
+        colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f,0.15f,0.40f,1.00f);
+        colors[ImGuiCol_Header]        = ImVec4(0.15f,0.25f,0.45f,0.80f);
+        colors[ImGuiCol_HeaderHovered] = ImVec4(0.20f,0.35f,0.60f,0.90f);
+        colors[ImGuiCol_HeaderActive]  = ImVec4(0.25f,0.45f,0.75f,1.00f);
+        colors[ImGuiCol_FrameBg]       = ImVec4(0.12f,0.12f,0.20f,0.80f);
+        colors[ImGuiCol_FrameBgHovered]= ImVec4(0.18f,0.18f,0.30f,0.90f);
+        colors[ImGuiCol_SliderGrab]    = ImVec4(0.30f,0.50f,0.90f,1.00f);
+        colors[ImGuiCol_CheckMark]     = ImVec4(0.40f,0.70f,1.00f,1.00f);
+        colors[ImGuiCol_Button]        = ImVec4(0.15f,0.25f,0.50f,0.80f);
+        colors[ImGuiCol_ButtonHovered] = ImVec4(0.25f,0.40f,0.70f,0.90f);
+        colors[ImGuiCol_ButtonActive]  = ImVec4(0.35f,0.55f,0.90f,1.00f);
+        colors[ImGuiCol_Separator]     = ImVec4(0.25f,0.25f,0.45f,0.80f);
+        colors[ImGuiCol_Text]          = ImVec4(0.90f,0.90f,0.95f,1.00f);
+        colors[ImGuiCol_TextDisabled]  = ImVec4(0.50f,0.50f,0.60f,1.00f);
 
         // Setup backends
         if (!ImGui_ImplGlfw_InitForOpenGL(window, true)) {
@@ -127,6 +127,10 @@ namespace RiftCore {
     ) {
         if (!initialized_ || !visible_) return;
 
+        // ── NEW: Drawing the Top Bar interface ────────────────
+        DrawTopMenuBar();
+        DrawToolBar();
+
         ImGui::PushStyleVar(
             ImGuiStyleVar_Alpha, opacity_);
 
@@ -135,6 +139,53 @@ namespace RiftCore {
         DrawObjectListPanel(selectedIdx, objects);
 
         ImGui::PopStyleVar();
+    }
+
+    // ── NEW: Method to draw the main menu (File, Edit, etc) ──
+    void HUD::DrawTopMenuBar() {
+        if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("New Scene", "Ctrl+N")) { if(callbacks_.OnNewScene) callbacks_.OnNewScene(); }
+                if (ImGui::MenuItem("Open Scene", "Ctrl+O")) { if(callbacks_.OnOpenScene) callbacks_.OnOpenScene(); }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { if(callbacks_.OnSaveScene) callbacks_.OnSaveScene(); }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("View")) {
+                ImGui::MenuItem("HUD Visible", nullptr, &visible_);
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+    }
+
+    // ── NEW: Method to draw the Toolbar (Play/Stop icons) ────
+    void HUD::DrawToolBar() {
+        // Toolbar background style
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.14f, 1.0f));
+        ImGui::SetNextWindowPos(ImVec2(0, 19)); // Positioned right under MainMenu
+        ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, 34));
+        
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse;
+
+        if (ImGui::Begin("##Toolbar", nullptr, flags)) {
+            // Play Button logic using your internal isPlaying_ state
+            if (!isPlaying_) {
+                if (ImGui::Button(" > PLAY ")) { 
+                    isPlaying_ = true; 
+                    if(callbacks_.OnPlay) callbacks_.OnPlay(); 
+                }
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+                if (ImGui::Button(" [ ] STOP ")) { 
+                    isPlaying_ = false; 
+                    if(callbacks_.OnStop) callbacks_.OnStop(); 
+                }
+                ImGui::PopStyleColor();
+            }
+            ImGui::End();
+        }
+        ImGui::PopStyleColor();
     }
 
     void HUD::DrawMainPanel(
@@ -148,14 +199,14 @@ namespace RiftCore {
         ImGuiIO& io = ImGui::GetIO();
     (void)io; // Suppress warning
         ImGui::SetNextWindowPos(
-            ImVec2(10, 10), ImGuiCond_Always);
+            ImVec2(10, 60), ImGuiCond_Always); // Changed from 10 to 60 to avoid overlap with MenuBar
         ImGui::SetNextWindowSize(
             ImVec2(320, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(opacity_);
 
         ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoResize         |
-            ImGuiWindowFlags_NoMove           |
+            ImGuiWindowFlags_NoResize          |
+            ImGuiWindowFlags_NoMove            |
             ImGuiWindowFlags_NoSavedSettings  |
             ImGuiWindowFlags_NoCollapse;
 
@@ -231,7 +282,7 @@ namespace RiftCore {
 
         // Position: top-left below main panel
         ImGui::SetNextWindowPos(
-            ImVec2(10, 280), ImGuiCond_Always);
+            ImVec2(10, 320), ImGuiCond_Always); // Adjusted slightly for the new MenuBar offset
         ImGui::SetNextWindowSize(
             ImVec2(320, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(opacity_);
@@ -398,7 +449,9 @@ namespace RiftCore {
         ImGui::End();
     }
 
+    // New methods added to match your header declarations
+    void HUD::DrawControlsPanel() {}
+    void HUD::DrawStatsPanel(const HUDRenderStats& stats) {}
+    void HUD::DrawCameraPanel(const HUDCameraInfo& cam) {}
+
 } // namespace RiftCore
-
-
-
