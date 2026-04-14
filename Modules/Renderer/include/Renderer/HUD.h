@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
@@ -50,6 +50,20 @@ namespace RiftCore {
         f32 fov  = 60.0f;
     };
 
+    /**
+     * NEW: HUDCallbacks struct
+     * This allows the Editor project to tell the Renderer DLL what should happen 
+     * when Menu items or Toolbar buttons are clicked, without the DLL needing 
+     * to know about the SceneSystem or Physics classes.
+     */
+    struct HUDCallbacks {
+        std::function<void()> OnNewScene;
+        std::function<void()> OnOpenScene;
+        std::function<void()> OnSaveScene;
+        std::function<void()> OnPlay;
+        std::function<void()> OnStop;
+    };
+
     // ── HUD class ─────────────────────────────────────────────
     class RENDERER_API HUD {
     public:
@@ -84,7 +98,17 @@ namespace RiftCore {
         // Settings
         void SetWindowOpacity(f32 alpha) { opacity_ = alpha; }
 
+        /** * NEW: Method to hook up engine-level logic to the UI 
+         */
+        void SetCallbacks(const HUDCallbacks& callbacks) { callbacks_ = callbacks; }
+
     private:
+        /**
+         * NEW: Methods for the top-level Editor interface
+         */
+        void DrawTopMenuBar();
+        void DrawToolBar();
+
         void DrawMainPanel(
             const HUDRenderStats& stats,
             i32 selectedIdx,
@@ -109,6 +133,10 @@ namespace RiftCore {
         bool initialized_ = false;
         bool visible_     = true;
         f32  opacity_     = 0.85f;
+        bool isPlaying_   = false; // Internal UI state for play/stop button toggle
+
+        // Callbacks storage
+        HUDCallbacks callbacks_;
 
         // FPS tracking
         f32  fpsAccum_    = 0.0f;
