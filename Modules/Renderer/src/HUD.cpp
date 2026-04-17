@@ -139,8 +139,38 @@ namespace RiftCore {
         DrawObjectListPanel(selectedIdx, objects);
 
         ImGui::PopStyleVar();
+        DrawConsolePanel();
     }
 
+    void HUD::DrawConsolePanel() {
+        ImGui::SetNextWindowPos(ImVec2(10, 720), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(600, 150), ImGuiCond_FirstUseEver);
+
+        if (ImGui::Begin("Developer Console")) {
+            // A static buffer to hold what you type
+            static char inputBuf[256] = "";
+
+            // Push Enter to submit
+            ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+
+            ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Execute Script Command:");
+            ImGui::SetNextItemWidth(-1); // Fill width
+
+            if (ImGui::InputText("##CommandInput", inputBuf, IM_ARRAYSIZE(inputBuf), flags)) {
+                // Fire the string to main.cpp!
+                if (callbacks_.OnExecuteCommand) {
+                    callbacks_.OnExecuteCommand(std::string(inputBuf));
+                }
+
+                // Clear the box after pressing Enter
+                inputBuf[0] = '\0';
+
+                // Keep focus so you can type the next command immediately
+                ImGui::SetKeyboardFocusHere(-1);
+            }
+        }
+        ImGui::End();
+    }
     // ── NEW: Method to draw the main menu (File, Edit, etc) ──
     void HUD::DrawTopMenuBar() {
         if (ImGui::BeginMainMenuBar()) {
@@ -450,8 +480,19 @@ namespace RiftCore {
     }
 
     // New methods added to match your header declarations
-    void HUD::DrawControlsPanel() {}
-    void HUD::DrawStatsPanel(const HUDRenderStats& stats) {}
-    void HUD::DrawCameraPanel(const HUDCameraInfo& cam) {}
+
+    void HUD::DrawControlsPanel() {
+        // This is empty, but has no parameters, so it's fine.
+    }
+
+    void HUD::DrawStatsPanel(const HUDRenderStats& stats) {
+        // FIX: Tell the compiler we are intentionally not using 'stats' yet
+        RIFTCORE_UNUSED(stats);
+    }
+
+    void HUD::DrawCameraPanel(const HUDCameraInfo& cam) {
+        // FIX: Tell the compiler we are intentionally not using 'cam' yet
+        RIFTCORE_UNUSED(cam);
+    }
 
 } // namespace RiftCore

@@ -1,32 +1,20 @@
-// ── SDK/include/RiftCore/Scripting/IScripting.h ───────────────
 #pragma once
-#include "../Common/Platform.h"
-#include "../Common/Types.h"
-#include "../Common/Result.h"
+#include <RiftCore/Common/Platform.h>
+#include <RiftCore/Common/Types.h>
+#include <RiftCore/Common/Result.h>
+#include <RiftCore/Core/IModule.h>
 
 namespace RiftCore {
 
-    class IScripting {
+    class IScripting : public IModule {
     public:
         virtual ~IScripting() = default;
 
-        virtual VoidResult  Initialize()                                    = 0;
-        virtual void        Shutdown()                                      = 0;
-        virtual VoidResult  LoadScript(const String& filePath)             = 0;
-        virtual VoidResult  ExecuteString(const String& code)              = 0;
-        virtual void        Update(f32 deltaTime)                           = 0;
-
-        // Call a script function by name
-        virtual VoidResult  CallFunction(
-            const String& name,
-            const std::vector<String>& args = {}
-        ) = 0;
-
-        // Register C++ function callable from scripts
-        virtual void RegisterFunction(
-            const String& name,
-            std::function<void()> fn
-        ) = 0;
+        // ONLY Scripting-specific methods belong here now.
+        // Initialize, OnUpdate, Shutdown, and GetDescriptor are inherited from IModule.
+        virtual VoidResult  LoadScript(const char* filePath) = 0;
+        virtual VoidResult  ExecuteString(const char* code) = 0;
+        virtual void        RegisterFunction(const char* name, void(*fn)()) = 0;
     };
 
 } // namespace RiftCore

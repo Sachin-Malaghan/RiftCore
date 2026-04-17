@@ -28,7 +28,7 @@
 #include <mutex>
 
 namespace RiftCore {
-
+    class IScripting;
     class EngineContext {
     public:
         EngineContext()  = default;

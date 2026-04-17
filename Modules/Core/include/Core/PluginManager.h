@@ -65,7 +65,10 @@ namespace RiftCore {
 
         template<typename T>
         T* GetModuleAs(const String& name) const {
-            return dynamic_cast<T*>(GetModule(name));
+            // NEVER use dynamic_cast across DLL boundaries.
+            // static_cast blindly trusts that the VTable matches, 
+            // which it will, as long as both inherit from IModule.
+            return static_cast<T*>(GetModule(name));
         }
 
         bool IsLoaded(const String& name) const;

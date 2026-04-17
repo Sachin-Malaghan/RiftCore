@@ -56,6 +56,7 @@ namespace RiftCore {
             const Mat4& viewMatrix,
             const Mat4& projMatrix
         );
+        std::function<void(const std::string&)> OnExecuteCommand;
         void EndFrame();
 
         EditorSelection  GetSelection() const {
@@ -88,6 +89,9 @@ namespace RiftCore {
 
         void AddLog(const std::string& msg,
                     bool isError = false);
+
+    private:
+        void DrawDeveloperConsole();
 
         ISceneSystem*      scene_    = nullptr;
         RenderSystem*      renderer_ = nullptr;

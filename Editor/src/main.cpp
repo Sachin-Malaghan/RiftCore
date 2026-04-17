@@ -73,6 +73,7 @@ int main()
         <SceneModule>("Scene");
     auto* scene = sceneMod->GetSceneSystem();
 
+
     // ── Initialize Editor UI ──────────────────────────────
     EditorUI editorUI;
     if (!editorUI.Initialize(
@@ -85,6 +86,29 @@ int main()
         return -1;
     }
     logger->Info("Editor","Editor UI initialized");
+
+    // ── Load Scripting Module ──────────────────────────────
+    // ── WIRE THE UI TO THE SCRIPTING MODULE HERE ───────────
+    plugins->LoadAndInit("Scripting", "RiftCore_Scripting.dll", params);
+    IScripting* scriptMod = plugins->GetModuleAs<IScripting>("Scripting");
+    //auto* logger = engine.GetLogger();
+
+    // Attach a Lambda to the hook we created in Step 1
+    editorUI.OnExecuteCommand = [scriptMod, logger](const std::string& cmd) 
+    {
+        if (scriptMod) {
+            logger->Info("Editor", "Sending command: " + cmd);
+
+            // Pass the command to the DLL safely
+            auto result = scriptMod->ExecuteString(cmd.c_str());
+            if (result.IsErr()) {
+                logger->Error("Scripting", result.Error().message);
+            }
+        }
+        else {
+            logger->Error("Editor", "Cannot execute: Scripting module is offline.");
+        }
+    };
 
     // ── Ground plane ──────────────────────────────────────
     physics->GetWorld()->AddGroundPlane(
@@ -220,7 +244,13 @@ int main()
                 }
             }
         }
-
+		// ── Scripting / Automation Update ─────────────────
+        // Run this BEFORE physics so script-driven forces 
+        // are applied in the current integration step.
+        if (scriptMod) {
+            scriptMod->OnUpdate(dt);
+        }
+		
         // Physics only runs in play mode
         if (editorUI.GetState().isPlaying &&
             !editorUI.GetState().isPaused) {
@@ -335,6 +365,9 @@ int main()
     logger->Info("Editor",
         "Done. Frames: " + std::to_string(totalFrames));
 
+	if (scriptMod) {
+        scriptMod->Shutdown();
+    }
     editorUI.Shutdown();
     renderer->DestroyMesh(cubeMesh);
     renderer->DestroyMesh(planeMesh);

@@ -62,6 +62,7 @@ namespace RiftCore {
         std::function<void()> OnSaveScene;
         std::function<void()> OnPlay;
         std::function<void()> OnStop;
+        std::function<void(const std::string&)> OnExecuteCommand;
     };
 
     // ── HUD class ─────────────────────────────────────────────
@@ -75,6 +76,7 @@ namespace RiftCore {
         // Initialize ImGui with GLFW + OpenGL3
         bool Initialize(GLFWwindow* window);
         void Shutdown();
+        void DrawConsolePanel();
 
         // Call at start of each frame (before rendering)
         void BeginFrame();

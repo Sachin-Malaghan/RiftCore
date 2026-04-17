@@ -14,16 +14,19 @@ target_link_libraries(RiftCoreRuntime
     PRIVATE RiftCore_Renderer
     PRIVATE RiftCore_Physics
     PRIVATE RiftCore_Scene
+	PRIVATE RiftCore_Scripting
 )
 
 target_include_directories(RiftCoreRuntime
     PRIVATE
+		${CMAKE_SOURCE_DIR}/SDK/include
         ${CMAKE_SOURCE_DIR}/Modules/Core/include
         ${CMAKE_SOURCE_DIR}/Modules/OpenGLBackend/include
         ${CMAKE_SOURCE_DIR}/Modules/Input/include
         ${CMAKE_SOURCE_DIR}/Modules/Renderer/include
         ${CMAKE_SOURCE_DIR}/Modules/Physics/include
         ${CMAKE_SOURCE_DIR}/Modules/Scene/include
+		${CMAKE_SOURCE_DIR}/Modules/Scripting/include
 )
 
 find_package(glad   CONFIG REQUIRED)

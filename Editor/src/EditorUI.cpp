@@ -111,6 +111,34 @@ namespace RiftCore {
         DrawConsolePanel();
         DrawStatsPanel();
         DrawViewportOverlay(viewMatrix, projMatrix);
+        DrawDeveloperConsole();
+    }
+
+    void EditorUI::DrawDeveloperConsole() {
+        ImGui::SetNextWindowPos(ImVec2(10, 720), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(600, 150), ImGuiCond_FirstUseEver);
+
+        if (ImGui::Begin("Developer Console")) {
+            static char inputBuf[256] = "";
+            ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "RiftCore Scripting >");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(-1);
+
+            // Wait for the user to press 'Enter'
+            if (ImGui::InputText("##ConsoleInput", inputBuf, IM_ARRAYSIZE(inputBuf), flags)) {
+
+                // If main.cpp attached a listener, fire the command!
+                if (OnExecuteCommand) {
+                    OnExecuteCommand(std::string(inputBuf));
+                }
+
+                inputBuf[0] = '\0'; // Clear the text box
+                ImGui::SetKeyboardFocusHere(-1); // Keep the cursor ready for the next command
+            }
+        }
+        ImGui::End();
     }
 
     void EditorUI::EndFrame() {
