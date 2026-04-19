@@ -72,6 +72,7 @@ namespace RiftCore {
     private:
         void BeginFrame();
         void UpdateFrame();
+        void ProcessUICommands();
         void EndFrame();
         void CalculateDeltaTime();
 

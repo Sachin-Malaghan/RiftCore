@@ -1,5 +1,4 @@
 ﻿#define NOMINMAX
-
 #include <Core/Engine.h>
 #include <Core/Logger.h>
 #include <Core/PluginManager.h>
@@ -13,10 +12,17 @@
 #include <Scene/SceneSystem.h>
 #include <Scene/SceneNode.h>
 
-#include <EditorUI.h>
+// New Modular UI Includes
+#include <UI/RiftCoreUI.h>
+#include <UI/Panels/ViewportPanel.h>
+#include <UI/Panels/HierarchyPanel.h>
+#include <UI/Panels/InspectorPanel.h>
+#include <UI/Panels/AssetBrowserPanel.h>
+#include <UI/Panels/VisualScriptingPanel.h>
+#include <UI/Panels/ConsolePanel.h>
 
 #include <glad/glad.h>
-
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <cmath>
 #include <string>
@@ -25,22 +31,24 @@ using namespace RiftCore;
 
 int main()
 {
+    // ===== INITIALIZATION =====
     Engine engine;
     EngineConfig config;
-    config.appName     = "RiftCore Editor";
+    config.appName = "RiftCore Editor";
     config.logFilePath = "RiftCoreEditor.log";
-    config.logLevel    = LogLevel::Info;
+    config.logLevel = LogLevel::Info;
     if (engine.Initialize(config).IsErr()) return -1;
 
-    auto* logger  = engine.GetLogger();
+    auto* logger = engine.GetLogger();
     auto* plugins = engine.GetPluginManager();
     ModuleInitParams params;
     params.context = engine.GetContext();
 
     // ── Load modules ──────────────────────────────────────
+    logger->Info("Editor", "Loading modules...");
     plugins->LoadAndInit("OpenGLBackend",
         "RiftCore_OpenGLBackend.dll", params);
-    auto* rhi    = engine.GetContext()->RHI();
+    auto* rhi = engine.GetContext()->RHI();
     auto  devRes = rhi->CreateDevice(nullptr);
     if (devRes.IsErr()) return -1;
     auto* device = static_cast<GLDevice*>(devRes.Value());
@@ -54,10 +62,10 @@ int main()
 
     plugins->LoadAndInit("Renderer",
         "RiftCore_Renderer.dll", params);
-    auto* rendMod  = plugins->GetModuleAs
+    auto* rendMod = plugins->GetModuleAs
         <RendererModule>("Renderer");
     auto* renderer = rendMod->GetRenderSystem();
-    if (renderer->Initialize(device,1280,720).IsErr())
+    if (renderer->Initialize(device, 1280, 720).IsErr())
         return -1;
     auto* texLoader = renderer->GetTextureLoader();
 
@@ -65,7 +73,7 @@ int main()
         "RiftCore_Physics.dll", params);
     auto* physMod = plugins->GetModuleAs
         <PhysicsModule>("Physics");
-    auto* physics  = physMod->GetPhysics();
+    auto* physics = physMod->GetPhysics();
 
     plugins->LoadAndInit("Scene",
         "RiftCore_Scene.dll", params);
@@ -73,207 +81,227 @@ int main()
         <SceneModule>("Scene");
     auto* scene = sceneMod->GetSceneSystem();
 
+    plugins->LoadAndInit("Scripting",
+        "RiftCore_Scripting.dll", params);
+    IScripting* scriptMod = plugins->GetModuleAs<IScripting>("Scripting");
 
-    // ── Initialize Editor UI ──────────────────────────────
-    EditorUI editorUI;
-    if (!editorUI.Initialize(
-        device->GetWindow(),
-        scene,
-        renderer,
-        physics,
-        logger)) {
-        logger->Error("Editor","UI init failed");
+    logger->Info("Editor", "All modules loaded successfully");
+
+    // ── Initialize UI ────────────────────────────────────
+    logger->Info("Editor", "Initializing UI...");
+    UI::RiftCoreUI riftUI;
+    if (!riftUI.Initialize(device->GetWindow())) {
+        logger->Error("Editor", "RIFT CORE UI init failed");
         return -1;
     }
-    logger->Info("Editor","Editor UI initialized");
+    UI::VisualScriptingPanel scriptPanel;
+    scriptPanel.Initialize();
 
-    // ── Load Scripting Module ──────────────────────────────
-    // ── WIRE THE UI TO THE SCRIPTING MODULE HERE ───────────
-    plugins->LoadAndInit("Scripting", "RiftCore_Scripting.dll", params);
-    IScripting* scriptMod = plugins->GetModuleAs<IScripting>("Scripting");
-    //auto* logger = engine.GetLogger();
+    // Panel Instances
+    UI::ViewportPanel viewportPanel;
+    UI::HierarchyPanel hierarchyPanel;
+    UI::InspectorPanel inspectorPanel;
+    UI::AssetBrowserPanel assetPanel;
+    UI::ConsolePanel consolePanel;
 
-    // Attach a Lambda to the hook we created in Step 1
-    editorUI.OnExecuteCommand = [scriptMod, logger](const std::string& cmd) 
-    {
-        if (scriptMod) {
-            logger->Info("Editor", "Sending command: " + cmd);
+    logger->Info("Editor", "Modular RIFT CORE UI initialized");
 
-            // Pass the command to the DLL safely
-            auto result = scriptMod->ExecuteString(cmd.c_str());
-            if (result.IsErr()) {
-                logger->Error("Scripting", result.Error().message);
-            }
-        }
-        else {
-            logger->Error("Editor", "Cannot execute: Scripting module is offline.");
-        }
-    };
+    // ── Physics Setup ────────────────────────────────────
+    logger->Info("Physics", "Creating ground plane...");
+    physics->GetWorld()->AddGroundPlane(0.0f, 0.6f, 0.6f);
 
-    // ── Ground plane ──────────────────────────────────────
-    physics->GetWorld()->AddGroundPlane(
-        0.0f, 0.6f, 0.6f);
-
-    // ── Load default scene ────────────────────────────────
+    // ── Load default scene ───────────────────────────────
+    logger->Info("Scene", "Loading scene...");
     std::string scenePath =
         "..\\..\\..\\Assets\\Scenes\\TestLevel.json";
     auto loadResult = scene->LoadScene(scenePath);
     if (loadResult.IsOk()) {
-        logger->Info("Editor",
+        logger->Info("Scene",
             "Loaded scene: TestLevel.json ("
             + std::to_string(scene->GetNodeCount())
             + " nodes)");
     } else {
+        logger->Warning("Scene",
+            "Failed to load TestLevel.json, creating new scene");
         scene->NewScene("NewScene");
-        logger->Info("Editor",
-            "Starting with empty scene");
+        logger->Info("Scene", "Starting with empty scene");
     }
 
-    // ── Meshes for rendering ──────────────────────────────
-    auto* cubeMesh   = renderer->UploadMesh(
+    // ── Meshes for rendering ─────────────────────────────
+    logger->Info("Renderer", "Loading meshes...");
+    auto* cubeMesh = renderer->UploadMesh(
         MeshFactory::CreateCube(1.0f)).Value();
-    auto* planeMesh  = renderer->UploadMesh(
-        MeshFactory::CreatePlane(30.0f,10)).Value();
+    auto* planeMesh = renderer->UploadMesh(
+        MeshFactory::CreatePlane(30.0f, 10)).Value();
     auto* sphereMesh = renderer->UploadMesh(
-        MeshFactory::CreateSphere(0.5f,20,20)).Value();
+        MeshFactory::CreateSphere(0.5f, 20, 20)).Value();
 
-    // ── Textures ──────────────────────────────────────────
-    u8 gA[4]={90,130,90,255}, gB[4]={60,90,60,255};
+    // ── Textures ─────────────────────────────────────────
+    logger->Info("Renderer", "Loading textures...");
+    u8 gA[4] = {90, 130, 90, 255}, gB[4] = {60, 90, 60, 255};
     auto* groundTex = texLoader->CreateCheckerboard(
-        "ground",256,32,gA,gB).Value();
-    auto* redTex    = texLoader->CreateSolidColor(
-        "red",200,80,80).Value();
-    auto* blueTex   = texLoader->CreateSolidColor(
-        "blue",80,100,220).Value();
-    auto* goldTex   = texLoader->CreateSolidColor(
-        "gold",220,180,50).Value();
-    auto* grayTex   = texLoader->CreateSolidColor(
-        "gray",160,160,160).Value();
-    auto* greenTex  = texLoader->CreateSolidColor(
-        "green",80,200,80).Value();
-    auto* checker   = texLoader->GetCheckerTexture();
+        "ground", 256, 32, gA, gB).Value();
+    auto* redTex = texLoader->CreateSolidColor(
+        "red", 200, 80, 80).Value();
+    auto* blueTex = texLoader->CreateSolidColor(
+        "blue", 80, 100, 220).Value();
+    auto* goldTex = texLoader->CreateSolidColor(
+        "gold", 220, 180, 50).Value();
+    auto* grayTex = texLoader->CreateSolidColor(
+        "gray", 160, 160, 160).Value();
+    auto* greenTex = texLoader->CreateSolidColor(
+        "green", 80, 200, 80).Value();
+    auto* checker = texLoader->GetCheckerTexture();
 
     auto makeMat = [](Texture2D* tex,
-                      f32 met=0.0f, f32 rou=0.5f) {
+                      f32 met = 0.0f, f32 rou = 0.5f) {
         MaterialData m;
-        m.albedo={1,1,1}; m.metallic=met;
-        m.roughness=rou;  m.albedoTex=tex;
+        m.albedo = {1, 1, 1};
+        m.metallic = met;
+        m.roughness = rou;
+        m.albedoTex = tex;
         return m;
     };
 
-    MaterialData groundMat = makeMat(groundTex,0,0.9f);
-    groundMat.texTileX=8; groundMat.texTileY=8;
+    MaterialData groundMat = makeMat(groundTex, 0, 0.9f);
+    groundMat.texTileX = 8;
+    groundMat.texTileY = 8;
 
-    // ── Editor camera ─────────────────────────────────────
+    // ── Editor camera ────────────────────────────────────
     Camera camera;
-    camera.SetPosition   ({0, 8, 16});
-    camera.SetFOV        (60.0f);
-    camera.SetAspectRatio(1280.0f/720.0f);
-    camera.SetClipPlanes (0.1f, 500.0f);
-    camera.RotatePitch   (-20.0f);
+    camera.SetPosition({0, 8, 16});
+    camera.SetFOV(60.0f);
+    camera.SetAspectRatio(1280.0f / 720.0f);
+    camera.SetClipPlanes(0.1f, 500.0f);
+    camera.RotatePitch(-20.0f);
 
-    f32 camYaw   = -90.0f;
+    f32 camYaw = -90.0f;
     f32 camPitch = -20.0f;
 
     Light sun;
-    sun.type      = LightType::Directional;
-    sun.direction = {-0.5f,-1.0f,-0.5f};
-    sun.color     = {1,0.95f,0.85f};
+    sun.type = LightType::Directional;
+    sun.direction = {-0.5f, -1.0f, -0.5f};
+    sun.color = {1, 0.95f, 0.85f};
     sun.intensity = 1.8f;
 
-    logger->Info("Editor","=================================");
-    logger->Info("Editor","EDITOR CONTROLS:");
-    logger->Info("Editor","  WASD+QE    = Move camera");
-    logger->Info("Editor","  Arrows     = Rotate camera");
-    logger->Info("Editor","  W/E/R      = Gizmo mode");
-    logger->Info("Editor","  Click      = Select object");
-    logger->Info("Editor","  Drag gizmo = Transform");
-    logger->Info("Editor","  Delete     = Delete selected");
-    logger->Info("Editor","  ESC        = Quit");
-    logger->Info("Editor","=================================");
+    logger->Info("Editor", "=================================");
+    logger->Info("Editor", "EDITOR CONTROLS:");
+    logger->Info("Editor", "  WASD+QE    = Move camera");
+    logger->Info("Editor", "  Arrows     = Rotate camera");
+    logger->Info("Editor", "  ESC        = Quit");
+    logger->Info("Editor", "=================================");
 
-    u32 frameCount  = 0;
+    u32 frameCount = 0;
     u64 totalFrames = 0;
     const f32 camSpd = 8.0f;
     const f32 rotSpd = 60.0f;
-    const f32 dt     = 0.016f;
+    const f32 dt = 0.016f;
 
+    // ── Load GL Function Pointers ────────────────────────
+    logger->Info("Renderer", "Loading OpenGL function pointers...");
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        logger->Error("Editor", "Failed to initialize GLAD pointers!");
+        return -1;
+    }
+
+    // ── Create Framebuffer ───────────────────────────────
+    logger->Info("Renderer", "Creating framebuffer...");
+    uint32_t fbo, sceneTexture, rbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    // Texture for rendering
+    glGenTextures(1, &sceneTexture);
+    glBindTexture(GL_TEXTURE_2D, sceneTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1280, 720, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneTexture, 0);
+
+    // Depth/Stencil buffer
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1280, 720);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        logger->Error("Renderer", "Framebuffer is not complete!");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    logger->Info("Editor", "Initialization complete. Starting main loop...");
+
+    // ===== MAIN LOOP =====
     while (!device->ShouldClose())
     {
         device->BeginFrame();
         if (input) input->Update();
 
-        editorUI.BeginFrame();
-
-        // ── Keyboard shortcuts ────────────────────────────
-        bool captureKB = editorUI.ShouldCaptureKeyboard();
-        bool captureMouse = editorUI.ShouldCaptureMouse();
-
-        if (input && !captureKB) {
-            if (input->IsKeyDown(Key::Escape)) break;
-
-            // Camera movement (only when not over UI)
-            if (!captureMouse) {
-                if (input->IsKeyDown(Key::W))
-                    camera.MoveForward(-camSpd*dt);
-                if (input->IsKeyDown(Key::S))
-                    camera.MoveForward( camSpd*dt);
-                if (input->IsKeyDown(Key::A))
-                    camera.MoveRight(-camSpd*dt);
-                if (input->IsKeyDown(Key::D))
-                    camera.MoveRight( camSpd*dt);
-                if (input->IsKeyDown(Key::Q))
-                    camera.MoveUp(-camSpd*dt);
-                if (input->IsKeyDown(Key::E))
-                    camera.MoveUp( camSpd*dt);
-                if (input->IsKeyDown(Key::Left)) {
-                    camera.RotateYaw(-rotSpd*dt);
-                    camYaw -= rotSpd*dt;
-                }
-                if (input->IsKeyDown(Key::Right)) {
-                    camera.RotateYaw( rotSpd*dt);
-                    camYaw += rotSpd*dt;
-                }
-                if (input->IsKeyDown(Key::Up)) {
-                    camera.RotatePitch( rotSpd*dt);
-                    camPitch += rotSpd*dt;
-                }
-                if (input->IsKeyDown(Key::Down)) {
-                    camera.RotatePitch(-rotSpd*dt);
-                    camPitch -= rotSpd*dt;
-                }
-            }
-        }
-		// ── Scripting / Automation Update ─────────────────
-        // Run this BEFORE physics so script-driven forces 
-        // are applied in the current integration step.
+        // ── Scripting / Automation Update ─────────────────
         if (scriptMod) {
             scriptMod->OnUpdate(dt);
         }
-		
-        // Physics only runs in play mode
-        if (editorUI.GetState().isPlaying &&
-            !editorUI.GetState().isPaused) {
-            physMod->OnUpdate(dt);
-        }
 
+        // ── Physics & Scene Update ───────────────────────
+        physMod->OnUpdate(dt);
         sceneMod->OnUpdate(dt);
 
-        // ── 3D Render ─────────────────────────────────────
+        // ── UI Frame Start ───────────────────────────────
+        riftUI.BeginFrame();
+
+        // ── Editor Camera Input ──────────────────────────
+        if (input) {
+            if (input->IsKeyDown(Key::Escape)) break;
+
+            // Camera movement
+            if (input->IsKeyDown(Key::W))
+                camera.MoveForward(-camSpd * dt);
+            if (input->IsKeyDown(Key::S))
+                camera.MoveForward(camSpd * dt);
+            if (input->IsKeyDown(Key::A))
+                camera.MoveRight(-camSpd * dt);
+            if (input->IsKeyDown(Key::D))
+                camera.MoveRight(camSpd * dt);
+            if (input->IsKeyDown(Key::Q))
+                camera.MoveUp(-camSpd * dt);
+            if (input->IsKeyDown(Key::E))
+                camera.MoveUp(camSpd * dt);
+            if (input->IsKeyDown(Key::Left)) {
+                camera.RotateYaw(-rotSpd * dt);
+                camYaw -= rotSpd * dt;
+            }
+            if (input->IsKeyDown(Key::Right)) {
+                camera.RotateYaw(rotSpd * dt);
+                camYaw += rotSpd * dt;
+            }
+            if (input->IsKeyDown(Key::Up)) {
+                camera.RotatePitch(rotSpd * dt);
+                camPitch += rotSpd * dt;
+            }
+            if (input->IsKeyDown(Key::Down)) {
+                camera.RotatePitch(-rotSpd * dt);
+                camPitch -= rotSpd * dt;
+            }
+        }
+
+        // ── 3D Scene Rendering (to FBO) ──────────────────
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glViewport(0, 0, 1280, 720);
+        glClearColor(0.08f, 0.08f, 0.12f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         renderer->BeginFrame(camera);
         renderer->SubmitLight(sun);
 
         // Ground
         {
             DrawCall dc;
-            dc.mesh      = planeMesh;
-            dc.material  = groundMat;
-            dc.transform = Math::Translate({0,0,0});
+            dc.mesh = planeMesh;
+            dc.material = groundMat;
+            dc.transform = Math::Translate({0, 0, 0});
             renderer->Submit(dc);
         }
 
         // Render all scene nodes
-        auto sel = editorUI.GetSelection();
         scene->ForEachNode([&](ISceneNode* node) {
             if (!node->IsActive()) return;
 
@@ -322,32 +350,46 @@ int main()
             if (sNode->hasPhysics &&
                 sNode->physicsDesc.colliderShape == "box") {
                 auto& he = sNode->physicsDesc.halfExtents;
-                renderScale = {he.x*2, he.y*2, he.z*2};
+                renderScale = {he.x * 2, he.y * 2, he.z * 2};
             }
 
             DrawCall dc;
-            dc.mesh      = mesh;
-            dc.material  = mat;
+            dc.mesh = mesh;
+            dc.material = mat;
             dc.transform = Math::TRSFull(
                 pos,
                 rot.x, rot.y, rot.z,
                 renderScale);
-
-            // Highlight selected
-            if (sel.hasNode &&
-                sel.nodeID == node->GetID()) {
-                dc.material.albedo = {1.5f, 1.5f, 0.6f};
-            }
 
             renderer->Submit(dc);
         });
 
         renderer->EndFrame();
 
-        // ── Editor UI + Gizmos ────────────────────────────
-        editorUI.Render(camera.GetViewMatrix(), camera.GetProjectionMatrix());
+        // ── UI Rendering (to main screen) ────────────────
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, 1280, 720);
+        glClearColor(0.05f, 0.05f, 0.07f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-        editorUI.EndFrame();
+        riftUI.OnUIRender();
+
+        // Render panels
+        viewportPanel.OnUIRender((uint32_t)(intptr_t)sceneTexture, ImVec2(1280, 720));
+        hierarchyPanel.OnUIRender(scene, riftUI.GetCommandBuffer());
+        inspectorPanel.OnUIRender(nullptr, riftUI.GetCommandBuffer());
+        assetPanel.OnUIRender();
+        scriptPanel.OnUIRender();
+        consolePanel.OnUIRender();
+
+        // ── Command Processing ──────────────────────────
+        auto commands = riftUI.GetCommandBuffer().Flush();
+        for (auto& cmd : commands) {
+            if (cmd.Type == UI::EditorCommandType::Play) consolePanel.AddLog("[Engine] Play Mode Started");
+            if (cmd.Type == UI::EditorCommandType::Stop) consolePanel.AddLog("[Engine] Play Mode Stopped");
+        }
+
+        riftUI.EndFrame();
 
         device->Present();
         frameCount++;
@@ -362,13 +404,19 @@ int main()
         }
     }
 
+    // ===== CLEANUP =====
     logger->Info("Editor",
         "Done. Frames: " + std::to_string(totalFrames));
 
-	if (scriptMod) {
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &sceneTexture);
+    glDeleteRenderbuffers(1, &rbo);
+
+    scriptPanel.Shutdown();
+    if (scriptMod) {
         scriptMod->Shutdown();
     }
-    editorUI.Shutdown();
+    riftUI.Shutdown();
     renderer->DestroyMesh(cubeMesh);
     renderer->DestroyMesh(planeMesh);
     renderer->DestroyMesh(sphereMesh);
@@ -376,4 +424,3 @@ int main()
     engine.Shutdown();
     return 0;
 }
-
