@@ -123,94 +123,10 @@ struct Mat3 {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  Quat – Unit quaternion (w, x, y, z)
- *
- *  Quaternions avoid gimbal lock and interpolation artefacts inherent
- *  in Euler angles.  Every RigidBody stores its orientation as a Quat
- *  and integrates angular velocity directly into it each sub-step.
+ *  NOTE: Quat is now defined in <RiftCore/Common/Types.h> with field
+ *        order (x, y, z, w).  The ToMat3 helper lives in PhysMath
+ *        below because it depends on Mat3 (defined in this header).
  * ═══════════════════════════════════════════════════════════════════════*/
-struct Quat {
-    f32 w = 1, x = 0, y = 0, z = 0;
-
-    static Quat Identity() { return {1, 0, 0, 0}; }
-
-    f32 LengthSq() const { return w*w + x*x + y*y + z*z; }
-
-    /// Re-normalise to unit length (drift accumulates over time).
-    Quat Normalized() const {
-        f32 len = std::sqrt(LengthSq());
-        if (len < 1e-8f) return Identity();
-        f32 inv = 1.0f / len;
-        return {w*inv, x*inv, y*inv, z*inv};
-    }
-
-    Quat Conjugate() const { return {w, -x, -y, -z}; }
-
-    /// Hamilton product – combines two rotations.
-    Quat operator*(const Quat& q) const {
-        return {
-            w*q.w - x*q.x - y*q.y - z*q.z,
-            w*q.x + x*q.w + y*q.z - z*q.y,
-            w*q.y - x*q.z + y*q.w + z*q.x,
-            w*q.z + x*q.y - y*q.x + z*q.w
-        };
-    }
-
-    /// Rotate vector v by this quaternion:  q·v·q⁻¹
-    /// Uses the optimised formula (avoids building a full matrix).
-    Vec3 Rotate(const Vec3& v) const {
-        Vec3 u = {x, y, z};
-        f32 s  = w;
-        f32 dotUV = u.x*v.x + u.y*v.y + u.z*v.z;
-        f32 dotUU = u.x*u.x + u.y*u.y + u.z*u.z;
-        Vec3 cross = {
-            u.y*v.z - u.z*v.y,
-            u.z*v.x - u.x*v.z,
-            u.x*v.y - u.y*v.x
-        };
-        return {
-            2.0f*dotUV*u.x + (s*s - dotUU)*v.x + 2.0f*s*cross.x,
-            2.0f*dotUV*u.y + (s*s - dotUU)*v.y + 2.0f*s*cross.y,
-            2.0f*dotUV*u.z + (s*s - dotUU)*v.z + 2.0f*s*cross.z
-        };
-    }
-
-    /// Build the equivalent 3×3 rotation matrix.
-    Mat3 ToMat3() const {
-        Mat3 r;
-        f32 xx = x*x, yy = y*y, zz = z*z;
-        f32 xy = x*y, xz = x*z, yz = y*z;
-        f32 wx = w*x, wy = w*y, wz = w*z;
-        r.m[0][0] = 1 - 2*(yy+zz);  r.m[0][1] = 2*(xy-wz);      r.m[0][2] = 2*(xz+wy);
-        r.m[1][0] = 2*(xy+wz);      r.m[1][1] = 1 - 2*(xx+zz);  r.m[1][2] = 2*(yz-wx);
-        r.m[2][0] = 2*(xz-wy);      r.m[2][1] = 2*(yz+wx);      r.m[2][2] = 1 - 2*(xx+yy);
-        return r;
-    }
-
-    /// Construct from an axis (must be unit-length) and an angle (rad).
-    static Quat FromAxisAngle(const Vec3& axis, f32 angle) {
-        f32 half = angle * 0.5f;
-        f32 s = std::sin(half);
-        return {std::cos(half), axis.x*s, axis.y*s, axis.z*s};
-    }
-
-    /// First-order integration:  q += ½·(0,ω)·q · dt
-    /// Then re-normalise.  Called every sub-step.
-    void IntegrateAngularVelocity(const Vec3& omega, f32 dt) {
-        Quat dq = {0, omega.x * 0.5f, omega.y * 0.5f, omega.z * 0.5f};
-        Quat spin = {
-            dq.w*w - dq.x*x - dq.y*y - dq.z*z,
-            dq.w*x + dq.x*w + dq.y*z - dq.z*y,
-            dq.w*y - dq.x*z + dq.y*w + dq.z*x,
-            dq.w*z + dq.x*y - dq.y*x + dq.z*w
-        };
-        w += spin.w * dt;
-        x += spin.x * dt;
-        y += spin.y * dt;
-        z += spin.z * dt;
-        *this = this->Normalized();
-    }
-};
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  Collision-layer bitmasks
@@ -529,6 +445,19 @@ private:
  *  can be used from both RigidBody.cpp and PhysicsWorld.cpp.
  * ═══════════════════════════════════════════════════════════════════════*/
 namespace PhysMath {
+
+    /// Build the equivalent 3×3 rotation matrix from a quaternion.
+    /// Lives here (not in Types.h) because it depends on Mat3.
+    inline Mat3 QuatToMat3(const Quat& q) {
+        Mat3 r;
+        f32 xx = q.x*q.x, yy = q.y*q.y, zz = q.z*q.z;
+        f32 xy = q.x*q.y, xz = q.x*q.z, yz = q.y*q.z;
+        f32 wx = q.w*q.x, wy = q.w*q.y, wz = q.w*q.z;
+        r.m[0][0] = 1 - 2*(yy+zz);  r.m[0][1] = 2*(xy-wz);      r.m[0][2] = 2*(xz+wy);
+        r.m[1][0] = 2*(xy+wz);      r.m[1][1] = 1 - 2*(xx+zz);  r.m[1][2] = 2*(yz-wx);
+        r.m[2][0] = 2*(xz-wy);      r.m[2][1] = 2*(yz+wx);      r.m[2][2] = 1 - 2*(xx+yy);
+        return r;
+    }
 
     inline f32 Dot(const Vec3& a, const Vec3& b) {
         return a.x*b.x + a.y*b.y + a.z*b.z;
