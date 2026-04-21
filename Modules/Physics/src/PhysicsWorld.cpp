@@ -248,9 +248,16 @@ namespace RiftCore {
 
         spatialHash_.Clear();
 
-        // Insert all bodies
-        for (u32 i = 0; i < n; i++)
-            spatialHash_.Insert(i, bodies_[i].GetAABB().Fattened(0.05f));
+        // Separate oversized bodies (planes / huge AABBs) that can't
+        // be inserted into the spatial hash without blowing up memory.
+        std::vector<u32> oversized;
+        for (u32 i = 0; i < n; i++) {
+            AABB fatAABB = bodies_[i].GetAABB().Fattened(0.05f);
+            if (spatialHash_.IsOversized(fatAABB))
+                oversized.push_back(i);
+            else
+                spatialHash_.Insert(i, fatAABB);
+        }
 
         std::unordered_set<u64> seen;
         std::vector<u32> candidates;
@@ -258,7 +265,15 @@ namespace RiftCore {
         for (u32 i = 0; i < n; i++) {
             RigidBody& a = bodies_[i];
             candidates.clear();
-            spatialHash_.Query(a.GetAABB().Fattened(0.05f), candidates);
+
+            AABB fatA = a.GetAABB().Fattened(0.05f);
+            if (!spatialHash_.IsOversized(fatA))
+                spatialHash_.Query(fatA, candidates);
+
+            // Oversized bodies (planes) must be tested against everyone
+            for (u32 oi : oversized) {
+                if (oi != i) candidates.push_back(oi);
+            }
 
             for (u32 j : candidates) {
                 if (j <= i) continue;  // canonical order + skip self
