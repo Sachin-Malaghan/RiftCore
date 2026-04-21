@@ -448,7 +448,7 @@ namespace RiftCore {
         Vec3 he = box.GetCollider().halfExtents;
 
         // Transform sphere centre into box-local space
-        Mat3 rot    = box.GetOrientation().ToMat3();
+        Mat3 rot    = QuatToMat3(box.GetOrientation());
         Mat3 rotInv = rot.Transposed();
         Vec3 local  = rotInv * Sub(sp, bp);
 
@@ -546,7 +546,7 @@ namespace RiftCore {
         f32  off = plane.GetCollider().planeOffset;
 
         // Oriented effective radius
-        Mat3 rot = box.GetOrientation().ToMat3();
+        Mat3 rot = QuatToMat3(box.GetOrientation());
         f32 proj = std::abs(Dot({rot.m[0][0], rot.m[1][0], rot.m[2][0]}, n)) * he.x +
                    std::abs(Dot({rot.m[0][1], rot.m[1][1], rot.m[2][1]}, n)) * he.y +
                    std::abs(Dot({rot.m[0][2], rot.m[1][2], rot.m[2][2]}, n)) * he.z;
@@ -656,7 +656,7 @@ namespace RiftCore {
         f32  r  = capsule.GetCollider().radius;
         Vec3 he = box.GetCollider().halfExtents;
 
-        Mat3 rot    = box.GetOrientation().ToMat3();
+        Mat3 rot    = QuatToMat3(box.GetOrientation());
         Mat3 rotInv = rot.Transposed();
         Vec3 local  = rotInv * Sub(closest, bp);
 
@@ -1147,7 +1147,7 @@ namespace RiftCore {
     {
         Vec3 pos = b.GetPosition();
         Vec3 he  = b.GetCollider().halfExtents;
-        Mat3 rot = b.GetOrientation().ToMat3();
+        Mat3 rot = QuatToMat3(b.GetOrientation());
 
         Vec3 delta = Sub(o, pos);
         Vec3 localO = rot.Transposed() * delta;
