@@ -1,11 +1,351 @@
 #pragma once
+/**
+ * @file AssetBrowserPanel.h
+ * @brief Production-grade Asset Browser Panel for RiftCore Engine
+ * 
+ * Provides a comprehensive interface for browsing, searching, filtering,
+ * and managing project assets. Inspired by Unreal Engine's Content Browser.
+ * 
+ * @author RiftCore Team
+ * @version 2.0.0
+ * @date 2026-04-21
+ */
+
 #include <string>
+#include <vector>
+#include <functional>
+#include <cstdint>
+
+// Forward declarations for engine types
+namespace RiftCore {
+    class IAssetManager;
+    class IAssetImporter;
+    class IAssetHandle;
+}
 
 namespace RiftCore::UI {
-    class AssetBrowserPanel {
-    public:
-        void OnUIRender();
-    private:
-        std::string m_CurrentDirectory = "Assets";
-    };
-}
+
+//=============================================================================
+// ENUMERATIONS
+//=============================================================================
+
+/**
+ * @enum EAssetType
+ * @brief Categorizes all supported asset types in the engine
+ */
+enum class EAssetType : uint8_t {
+    Unknown = 0,
+    Folder,
+    Texture2D,
+    TextureCube,
+    Material,
+    Mesh,
+    SkeletalMesh,
+    Animation,
+    Audio,
+    Script,
+    Blueprint,
+    Prefab,
+    Scene,
+    Shader,
+    Font,
+    ParticleSystem,
+    PhysicsMaterial,
+    COUNT
+};
+
+/**
+ * @enum EAssetSortMode
+ * @brief Defines how assets are sorted in the browser
+ */
+enum class EAssetSortMode : uint8_t {
+    Name_Ascending,
+    Name_Descending,
+    Type_Ascending,
+    Type_Descending,
+    Size_Ascending,
+    Size_Descending,
+    DateModified_Newest,
+    DateModified_Oldest
+};
+
+/**
+ * @enum EViewMode
+ * @brief Asset browser view modes
+ */
+enum class EViewMode : uint8_t {
+    Grid,
+    List,
+    Columns
+};
+
+//=============================================================================
+// DATA STRUCTURES
+//=============================================================================
+
+/**
+ * @struct FAssetEntry
+ * @brief Represents a single asset in the browser
+ */
+struct FAssetEntry {
+    uint64_t        ID;             ///< Unique asset identifier
+    std::string     Name;           ///< Display name
+    std::string     Path;           ///< Full path from root
+    std::string     Extension;      ///< File extension
+    EAssetType      Type;           ///< Asset type category
+    uint64_t        SizeBytes;      ///< File size in bytes
+    uint64_t        LastModified;   ///< Unix timestamp
+    bool            bIsDirectory;   ///< True if this is a folder
+    bool            bIsSelected;    ///< Currently selected
+    bool            bIsRenaming;    ///< In rename mode
+    uint32_t        ThumbnailID;    ///< Cached thumbnail texture ID
+    
+    FAssetEntry() 
+        : ID(0), Type(EAssetType::Unknown), SizeBytes(0), LastModified(0),
+          bIsDirectory(false), bIsSelected(false), bIsRenaming(false), ThumbnailID(0) {}
+};
+
+/**
+ * @struct FAssetFilter
+ * @brief Filter settings for the asset browser
+ */
+struct FAssetFilter {
+    bool            TypeFilters[static_cast<size_t>(EAssetType::COUNT)];
+    std::string     SearchQuery;
+    bool            bShowOnlyModified;
+    bool            bShowHiddenAssets;
+    
+    FAssetFilter() : bShowOnlyModified(false), bShowHiddenAssets(false) {
+        for (size_t i = 0; i < static_cast<size_t>(EAssetType::COUNT); ++i) {
+            TypeFilters[i] = true;
+        }
+    }
+};
+
+//=============================================================================
+// ASSET BROWSER PANEL CLASS
+//=============================================================================
+
+/**
+ * @class AssetBrowserPanel
+ * @brief Main asset browser panel for the editor
+ * 
+ * Features:
+ * - Hierarchical folder navigation with breadcrumbs
+ * - Grid/List/Column view modes
+ * - Asset type filtering and search
+ * - Drag-and-drop support
+ * - Context menus for asset operations
+ * - Thumbnail caching and preview
+ * - Keyboard shortcuts (F2 rename, Delete, Ctrl+C/V/X)
+ */
+class AssetBrowserPanel {
+public:
+    //-------------------------------------------------------------------------
+    // Lifecycle
+    //-------------------------------------------------------------------------
+    
+    /**
+     * @brief Initializes the asset browser panel
+     * 
+     * Sets up thumbnail cache, registers asset type handlers,
+     * and loads user preferences.
+     */
+    void Initialize();
+    
+    /**
+     * @brief Shuts down the panel and releases resources
+     */
+    void Shutdown();
+    
+    //-------------------------------------------------------------------------
+    // Rendering
+    //-------------------------------------------------------------------------
+    
+    /**
+     * @brief Main render function called every frame
+     */
+    void OnUIRender();
+    
+    //-------------------------------------------------------------------------
+    // Navigation
+    //-------------------------------------------------------------------------
+    
+    /**
+     * @brief Navigates to the specified directory
+     * @param path Relative path from asset root
+     */
+    void NavigateTo(const std::string& path);
+    
+    /**
+     * @brief Navigates up one directory level
+     */
+    void NavigateUp();
+    
+    /**
+     * @brief Navigates back in history
+     */
+    void NavigateBack();
+    
+    /**
+     * @brief Navigates forward in history
+     */
+    void NavigateForward();
+    
+    /**
+     * @brief Refreshes the current directory contents
+     */
+    void Refresh();
+    
+    //-------------------------------------------------------------------------
+    // Selection
+    //-------------------------------------------------------------------------
+    
+    /**
+     * @brief Gets the currently selected assets
+     * @return Vector of selected asset entries
+     */
+    std::vector<FAssetEntry> GetSelectedAssets() const;
+    
+    /**
+     * @brief Clears the current selection
+     */
+    void ClearSelection();
+    
+    /**
+     * @brief Selects an asset by ID
+     * @param assetID The asset to select
+     * @param addToSelection If true, adds to existing selection
+     */
+    void SelectAsset(uint64_t assetID, bool addToSelection = false);
+    
+    //-------------------------------------------------------------------------
+    // Operations
+    //-------------------------------------------------------------------------
+    
+    /**
+     * @brief Creates a new folder in the current directory
+     * @param name Folder name
+     */
+    void CreateFolder(const std::string& name = "New Folder");
+    
+    /**
+     * @brief Deletes the selected assets
+     * @param bPermanent If true, permanently deletes; otherwise moves to trash
+     */
+    void DeleteSelected(bool bPermanent = false);
+    
+    /**
+     * @brief Duplicates the selected assets
+     */
+    void DuplicateSelected();
+    
+    /**
+     * @brief Renames the specified asset
+     * @param assetID Asset to rename
+     * @param newName New name
+     */
+    void RenameAsset(uint64_t assetID, const std::string& newName);
+    
+    //-------------------------------------------------------------------------
+    // Configuration
+    //-------------------------------------------------------------------------
+    
+    /**
+     * @brief Sets the view mode
+     * @param mode Grid, List, or Columns
+     */
+    void SetViewMode(EViewMode mode);
+    
+    /**
+     * @brief Sets the sort mode
+     * @param mode Sorting criterion
+     */
+    void SetSortMode(EAssetSortMode mode);
+    
+    /**
+     * @brief Sets the thumbnail size (for grid view)
+     * @param size Size in pixels (64-256)
+     */
+    void SetThumbnailSize(float size);
+    
+    /**
+     * @brief Gets the current filter settings
+     * @return Reference to filter struct
+     */
+    FAssetFilter& GetFilter();
+    
+    //-------------------------------------------------------------------------
+    // Callbacks
+    //-------------------------------------------------------------------------
+    
+    /** Callback for asset double-click (open) */
+    using AssetOpenCallback = std::function<void(const FAssetEntry&)>;
+    
+    /** Callback for drag-drop onto scene */
+    using AssetDropCallback = std::function<void(const std::vector<FAssetEntry>&)>;
+    
+    void SetOnAssetOpen(AssetOpenCallback callback);
+    void SetOnAssetDrop(AssetDropCallback callback);
+    
+private:
+    //-------------------------------------------------------------------------
+    // Internal State
+    //-------------------------------------------------------------------------
+    
+    std::string             m_CurrentDirectory;
+    std::string             m_RootDirectory;
+    std::vector<std::string> m_PathHistory;
+    int                     m_HistoryIndex;
+    
+    std::vector<FAssetEntry> m_Entries;
+    std::vector<FAssetEntry> m_FilteredEntries;
+    
+    EViewMode               m_ViewMode;
+    EAssetSortMode          m_SortMode;
+    FAssetFilter            m_Filter;
+    float                   m_ThumbnailSize;
+    
+    char                    m_SearchBuffer[256];
+    bool                    m_bNeedsRefresh;
+    
+    AssetOpenCallback       m_OnAssetOpen;
+    AssetDropCallback       m_OnAssetDrop;
+    
+    //-------------------------------------------------------------------------
+    // Internal Methods
+    //-------------------------------------------------------------------------
+    
+    void DrawToolbar();
+    void DrawBreadcrumbs();
+    void DrawFolderTree();
+    void DrawContentArea();
+    void DrawGridView();
+    void DrawListView();
+    void DrawColumnView();
+    void DrawAssetContextMenu();
+    void DrawBackgroundContextMenu();
+    void ApplyFilters();
+    void SortEntries();
+    void HandleKeyboardShortcuts();
+    void HandleDragDrop();
+    uint32_t LoadThumbnail(const FAssetEntry& entry);
+};
+
+//=============================================================================
+// UTILITY FUNCTIONS
+//=============================================================================
+
+/** Gets the display name for an asset type */
+const char* GetAssetTypeName(EAssetType type);
+
+/** Gets the icon for an asset type (for font-based icons) */
+const char* GetAssetTypeIcon(EAssetType type);
+
+/** Gets the color associated with an asset type */
+uint32_t GetAssetTypeColor(EAssetType type);
+
+/** Determines asset type from file extension */
+EAssetType GetAssetTypeFromExtension(const std::string& extension);
+
+} // namespace RiftCore::UI
