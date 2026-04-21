@@ -12,6 +12,7 @@
 #include <string>
 #include <array>
 #include <functional>
+#include <cmath>
 
 // ── Primitive Type Aliases ───────────────────────────────────
 // Explicit-size types — NEVER use raw int/long in engine code
@@ -87,13 +88,80 @@ namespace RiftCore {
     };
 
     // ── Quaternion ───────────────────────────────────────────
+    //  Unit quaternion stored as (x, y, z, w).
+    //  Quaternions avoid gimbal lock and interpolation artefacts
+    //  inherent in Euler angles.
     struct Quat {
         f32 x = 0.0f, y = 0.0f, z = 0.0f, w = 1.0f;  // identity
 
         Quat() = default;
         Quat(f32 x, f32 y, f32 z, f32 w) : x(x), y(y), z(z), w(w) {}
 
-        static Quat Identity() { return {0,0,0,1}; }
+        static Quat Identity() { return {0, 0, 0, 1}; }
+
+        f32 LengthSq() const { return w*w + x*x + y*y + z*z; }
+
+        /// Re-normalise to unit length (drift accumulates over time).
+        Quat Normalized() const {
+            f32 len = std::sqrt(LengthSq());
+            if (len < 1e-8f) return Identity();
+            f32 inv = 1.0f / len;
+            return {x*inv, y*inv, z*inv, w*inv};
+        }
+
+        Quat Conjugate() const { return {-x, -y, -z, w}; }
+
+        /// Hamilton product – combines two rotations.
+        Quat operator*(const Quat& q) const {
+            return {
+                w*q.x + x*q.w + y*q.z - z*q.y,
+                w*q.y - x*q.z + y*q.w + z*q.x,
+                w*q.z + x*q.y - y*q.x + z*q.w,
+                w*q.w - x*q.x - y*q.y - z*q.z
+            };
+        }
+
+        /// Rotate vector v by this quaternion:  q·v·q⁻¹
+        Vec3 Rotate(const Vec3& v) const {
+            Vec3 u  = {x, y, z};
+            f32  s  = w;
+            f32 dotUV = u.x*v.x + u.y*v.y + u.z*v.z;
+            f32 dotUU = u.x*u.x + u.y*u.y + u.z*u.z;
+            Vec3 cross = {
+                u.y*v.z - u.z*v.y,
+                u.z*v.x - u.x*v.z,
+                u.x*v.y - u.y*v.x
+            };
+            return {
+                2.0f*dotUV*u.x + (s*s - dotUU)*v.x + 2.0f*s*cross.x,
+                2.0f*dotUV*u.y + (s*s - dotUU)*v.y + 2.0f*s*cross.y,
+                2.0f*dotUV*u.z + (s*s - dotUU)*v.z + 2.0f*s*cross.z
+            };
+        }
+
+        /// Construct from an axis (must be unit-length) and an angle (rad).
+        static Quat FromAxisAngle(const Vec3& axis, f32 angle) {
+            f32 half = angle * 0.5f;
+            f32 s = std::sin(half);
+            return {axis.x*s, axis.y*s, axis.z*s, std::cos(half)};
+        }
+
+        /// First-order integration:  q += ½·(0,ω)·q · dt
+        /// Then re-normalise.  Called every sub-step.
+        void IntegrateAngularVelocity(const Vec3& omega, f32 dt) {
+            Quat dq = {omega.x * 0.5f, omega.y * 0.5f, omega.z * 0.5f, 0};
+            Quat spin = {
+                dq.w*x + dq.x*w + dq.y*z - dq.z*y,
+                dq.w*y - dq.x*z + dq.y*w + dq.z*x,
+                dq.w*z + dq.x*y - dq.y*x + dq.z*w,
+                dq.w*w - dq.x*x - dq.y*y - dq.z*z
+            };
+            x += spin.x * dt;
+            y += spin.y * dt;
+            z += spin.z * dt;
+            w += spin.w * dt;
+            *this = this->Normalized();
+        }
     };
 
     // ── 4x4 Matrix ───────────────────────────────────────────
