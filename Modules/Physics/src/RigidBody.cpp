@@ -122,7 +122,7 @@ namespace RiftCore {
             worldInvInertia_ = Mat3::Zero();
             return;
         }
-        Mat3 R  = orientation_.ToMat3();
+        Mat3 R  = QuatToMat3(orientation_);
         Mat3 Rt = R.Transposed();
         worldInvInertia_ = R * localInvInertia_ * Rt;
     }
@@ -365,7 +365,7 @@ namespace RiftCore {
 
         case ColliderShape::Box: {
             // Rotate each axis of the half-extents and take abs
-            Mat3 rot = orientation_.ToMat3();
+            Mat3 rot = QuatToMat3(orientation_);
             Vec3 he  = col.halfExtents;
             f32 ex = std::abs(rot.m[0][0])*he.x + std::abs(rot.m[0][1])*he.y + std::abs(rot.m[0][2])*he.z;
             f32 ey = std::abs(rot.m[1][0])*he.x + std::abs(rot.m[1][1])*he.y + std::abs(rot.m[1][2])*he.z;
