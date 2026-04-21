@@ -387,8 +387,28 @@ public:
 
     f32 GetCellSize() const { return cellSize_; }
 
+    /// Maximum cells an AABB may span per axis before we skip insertion.
+    /// Prevents infinite planes / huge AABBs from blowing up memory.
+    static constexpr i32 kMaxCellsPerAxis = 128;
+
+    /// Returns true if the AABB spans too many cells to be inserted.
+    bool IsOversized(const AABB& aabb) const {
+        i32 spanX = static_cast<i32>(std::floor(aabb.max.x * invCellSize_))
+                  - static_cast<i32>(std::floor(aabb.min.x * invCellSize_));
+        i32 spanY = static_cast<i32>(std::floor(aabb.max.y * invCellSize_))
+                  - static_cast<i32>(std::floor(aabb.min.y * invCellSize_));
+        i32 spanZ = static_cast<i32>(std::floor(aabb.max.z * invCellSize_))
+                  - static_cast<i32>(std::floor(aabb.min.z * invCellSize_));
+        return spanX > kMaxCellsPerAxis ||
+               spanY > kMaxCellsPerAxis ||
+               spanZ > kMaxCellsPerAxis;
+    }
+
     /// Insert a body index into every cell its AABB touches.
+    /// Skips bodies whose AABB is too large (e.g. infinite planes).
     void Insert(u32 index, const AABB& aabb) {
+        if (IsOversized(aabb)) return;  // handled separately by caller
+
         i32 minX = static_cast<i32>(std::floor(aabb.min.x * invCellSize_));
         i32 minY = static_cast<i32>(std::floor(aabb.min.y * invCellSize_));
         i32 minZ = static_cast<i32>(std::floor(aabb.min.z * invCellSize_));
@@ -405,6 +425,8 @@ public:
     /// Return every body index stored in cells overlapped by `aabb`.
     /// Caller is responsible for de-duplicating and self-filtering.
     void Query(const AABB& aabb, std::vector<u32>& results) const {
+        if (IsOversized(aabb)) return;  // caller must brute-force these
+
         i32 minX = static_cast<i32>(std::floor(aabb.min.x * invCellSize_));
         i32 minY = static_cast<i32>(std::floor(aabb.min.y * invCellSize_));
         i32 minZ = static_cast<i32>(std::floor(aabb.min.z * invCellSize_));
