@@ -23,6 +23,7 @@ loaded at runtime with zero hard dependencies between modules.
 | Scene | Stub | Planned |
 | Scripting | Stub | Planned |
 | VR | Stub | Planned |
+| in editor Panels are comming
 
 ## Features
 
