@@ -111,14 +111,42 @@ struct FConsoleFilter {
  */
 struct FConsoleState {
     char            InputBuffer[1024];      ///< Command input buffer
+    char            SearchBuffer[256];      ///< Search/filter buffer
     std::vector<std::string> CommandHistory;///< Command history
-    int             HistoryPos;             ///< Current position in history
+    int             HistoryPos;             ///< Current position in history (renamed from HistoryIndex)
+    int             HistoryIndex;           ///< Alias for HistoryPos
     bool            bScrollToBottom;        ///< Should scroll to bottom
     bool            bAutoScroll;            ///< Auto-scroll enabled
+    bool            bNeedsRefilter;         ///< Filter needs reapplication
+    bool            bWrapText;              ///< Wrap long lines
+    bool            bShowTimestamps;        ///< Show message timestamps
+    bool            bShowCategories;        ///< Show category column
+    bool            bShowFrameNumbers;      ///< Show frame numbers
+    bool            bShowSourceLocation;    ///< Show source file/line
+    bool            bShowFilters;           ///< Show filter panel
+    bool            bShowSettings;          ///< Show settings panel
+    bool            bUseRegex;              ///< Use regex for search
+    bool            bCaseSensitive;         ///< Case-sensitive search
+    bool            VerbosityFilters[7];    ///< Filter by verbosity level
+    bool            CategoryFilters[16];    ///< Filter by category
+    uint32_t        TotalMessages;          ///< Total message count
+    uint32_t        ErrorCount;             ///< Error message count
+    uint32_t        WarningCount;           ///< Warning message count
+    uint32_t        FilteredCount;          ///< Filtered message count
+    float           FilterPanelWidth;       ///< Width of filter panel
+    float           FontScale;              ///< Font scale factor
     
     FConsoleState()
-        : HistoryPos(-1), bScrollToBottom(false), bAutoScroll(true) {
+        : HistoryPos(-1), HistoryIndex(-1), bScrollToBottom(false), bAutoScroll(true),
+          bNeedsRefilter(false), bWrapText(false), bShowTimestamps(true),
+          bShowCategories(true), bShowFrameNumbers(false), bShowSourceLocation(false),
+          bShowFilters(true), bShowSettings(false), bUseRegex(false), bCaseSensitive(false),
+          TotalMessages(0), ErrorCount(0), WarningCount(0), FilteredCount(0),
+          FilterPanelWidth(200.0f), FontScale(1.0f) {
         InputBuffer[0] = '\0';
+        SearchBuffer[0] = '\0';
+        for (int i = 0; i < 7; ++i) VerbosityFilters[i] = true;
+        for (int i = 0; i < 16; ++i) CategoryFilters[i] = true;
     }
 };
 
