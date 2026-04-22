@@ -26,7 +26,6 @@
 
 #include <UI/Panels/ViewportPanel.h>
 #include <imgui.h>
-#include <ImGuizmo.h>
 #include <cmath>
 #include <algorithm>
 
@@ -123,8 +122,11 @@ static const char* GetGizmoModeName(EGizmoMode mode);
  * └─────────────────────────────────────────────────────────────┘
  */
 void ViewportPanel::OnUIRender(uint32_t sceneTextureID, const ImVec2& viewportSize) {
-    // Guard: ImGui context may be null if called across DLL boundaries before HUD sets it
-    if (!ImGui::GetCurrentContext()) return;
+    // Re-sync ImGui context every frame — Editor.exe has its own GImGui copy
+    // (separate static lib); SetCurrentContext routes all imgui calls to Renderer.dll's context.
+    static ImGuiContext* s_Ctx = ImGui::GetCurrentContext();
+    if (!s_Ctx) return;
+    ImGui::SetCurrentContext(s_Ctx);
 
     // No padding for viewport to maximize scene area
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
