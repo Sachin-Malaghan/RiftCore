@@ -13,9 +13,11 @@
  */
 
 #include <RiftCore/Scene/ISceneSystem.h>
-#include <UI/Commands/CommandBuffer.h>
+#include <Renderer/HUD.h>  // For CommandBuffer (consolidated UI system)
+#include <imgui.h>
 #include <vector>
 #include <string>
+#include <unordered_set>
 #include <functional>
 #include <cstdint>
 
@@ -44,6 +46,16 @@ enum class EHierarchySortMode : uint8_t {
     Alphabetical,   ///< A-Z by name
     Type,           ///< By node type
     Visibility      ///< Visible first
+};
+
+/**
+ * @enum ENodeSortMode
+ * @brief Sort modes for nodes (alternative naming)
+ */
+enum class ENodeSortMode : uint8_t {
+    CreationOrder,  ///< Original creation order
+    Alphabetical,   ///< A-Z by name
+    Type            ///< By node type
 };
 
 /**
@@ -127,6 +139,35 @@ struct FHierarchyFilter {
           bFilterMesh(false), bFilterPhysics(false),
           bFilterScript(false), bFilterLight(false),
           bFilterCamera(false) {}
+};
+
+/**
+ * @struct FHierarchyState
+ * @brief Encapsulates all mutable state for the hierarchy panel
+ */
+struct FHierarchyState {
+    char                            SearchBuffer[128];      ///< Search input buffer
+    char                            RenameBuffer[256];      ///< Rename input buffer
+    std::unordered_set<uint64_t>    SelectedNodeIDs;        ///< Currently selected node IDs
+    std::unordered_set<std::string> TypeFilters;            ///< Active type filters
+    ENodeSortMode                   SortMode;               ///< Current sort mode
+    uint64_t                        RenamingNodeID;         ///< Node being renamed
+    uint64_t                        LastClickedNodeID;      ///< For double-click detection
+    float                           LastClickTime;          ///< Time of last click
+    bool                            bNeedsRefresh;          ///< Needs hierarchy refresh
+    bool                            bNeedsRefilter;         ///< Needs filter reapplication
+    bool                            bShowHiddenNodes;       ///< Show hidden nodes
+    bool                            bShowLockedNodes;       ///< Show locked nodes
+    bool                            bShowTypeFilter;        ///< Show type filter dropdown
+    
+    FHierarchyState()
+        : SortMode(ENodeSortMode::CreationOrder), RenamingNodeID(0),
+          LastClickedNodeID(0), LastClickTime(0.0f), bNeedsRefresh(true),
+          bNeedsRefilter(false), bShowHiddenNodes(true), bShowLockedNodes(true),
+          bShowTypeFilter(false) {
+        SearchBuffer[0] = '\0';
+        RenameBuffer[0] = '\0';
+    }
 };
 
 //=============================================================================
@@ -247,6 +288,11 @@ public:
      */
     void ReparentNode(SceneNodeID nodeID, SceneNodeID newParentID, int insertIndex = -1);
     
+    /**
+     * @brief Refreshes the hierarchy tree
+     */
+    void Refresh();
+    
     //-------------------------------------------------------------------------
     // Visibility
     //-------------------------------------------------------------------------
@@ -323,12 +369,14 @@ private:
     
     std::vector<FHierarchyNode> m_Nodes;
     std::vector<SceneNodeID>    m_SelectedNodes;
+    SceneNodeID                 m_SelectedNode;
     SceneNodeID                 m_LastSelectedNode;
     SceneNodeID                 m_DraggedNode;
     SceneNodeID                 m_DropTargetNode;
     int                         m_DropTargetPosition;
     
     FHierarchyFilter            m_Filter;
+    FHierarchyState             m_State;
     EHierarchySortMode          m_SortMode;
     char                        m_SearchBuffer[256];
     char                        m_RenameBuffer[256];
@@ -372,6 +420,6 @@ private:
 const char* GetNodeIcon(const FHierarchyNode& node);
 
 /** Gets the display color for a node type */
-uint32_t GetNodeTypeColor(const std::string& typeName);
+ImVec4 GetNodeTypeColor(const std::string& typeName);
 
 } // namespace RiftCore::UI
