@@ -202,15 +202,8 @@ public:
     // Lifecycle
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Initializes the hierarchy panel
-     */
-    void Initialize();
-    
-    /**
-     * @brief Shuts down the panel
-     */
-    void Shutdown();
+    void Initialize() {}
+    void Shutdown() {}
     
     //-------------------------------------------------------------------------
     // Rendering
@@ -233,17 +226,8 @@ public:
      */
     SceneNodeID GetSelectedNode() const;
     
-    /**
-     * @brief Gets the primary selected node as uint64_t
-     * @return Selected node ID (0 if none)
-     */
-    uint64_t GetSelectedNodeID() const;
-    
-    /**
-     * @brief Gets all selected nodes
-     * @return Vector of selected node IDs
-     */
-    std::vector<SceneNodeID> GetSelectedNodes() const;
+    uint64_t GetSelectedNodeID() const { return static_cast<uint64_t>(m_SelectedNode); }
+    std::vector<SceneNodeID> GetSelectedNodes() const { return m_SelectedNodes; }
     
     /**
      * @brief Sets the selected node
@@ -378,12 +362,6 @@ public:
     void SetOnSelectionChanged(SelectionCallback callback) { m_OnSelectionChanged = callback; }
     void SetOnNodeAction(NodeActionCallback callback) { m_OnNodeAction = callback; }
     
-    // Stub implementations for methods not yet implemented in .cpp
-    void Initialize() {}
-    void Shutdown() {}
-    uint64_t GetSelectedNodeID() const { return static_cast<uint64_t>(m_SelectedNode); }
-    std::vector<SceneNodeID> GetSelectedNodes() const { return m_SelectedNodes; }
-
 private:
     //-------------------------------------------------------------------------
     // Internal State
