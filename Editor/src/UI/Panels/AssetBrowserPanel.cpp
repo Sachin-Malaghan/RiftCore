@@ -95,7 +95,7 @@ struct FBrowserStateInternal {
 // STATIC STATE
 //=============================================================================
 
-static FBrowserState s_State;
+static FBrowserStateInternal s_State;
 static std::vector<FAssetEntry> s_CachedAssets;
 static std::vector<FAssetEntry*> s_FilteredAssets;
 static bool s_bNeedsRefresh = true;
