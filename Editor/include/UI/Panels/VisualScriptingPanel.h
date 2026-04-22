@@ -276,259 +276,78 @@ struct FVisualScriptState {
 class VisualScriptingPanel {
 public:
     //-------------------------------------------------------------------------
-    // Lifecycle
+    // Lifecycle - real .cpp implementations
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Initializes the visual scripting panel
-     * 
-     * Creates the node editor context and loads node templates.
-     */
     void Initialize();
-    
-    /**
-     * @brief Shuts down the panel and releases resources
-     */
     void Shutdown();
     
     //-------------------------------------------------------------------------
-    // Rendering
+    // Rendering - real .cpp implementation
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Main render function called every frame
-     */
     void OnUIRender();
     
     //-------------------------------------------------------------------------
-    // Script Management
+    // Script Management - LoadScript and SaveScript have .cpp implementations
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Creates a new empty script
-     * @param name Script name
-     */
-    void NewScript(const std::string& name = "NewScript");
-    
-    /**
-     * @brief Loads a visual script for editing
-     * @param assetID The asset ID of the script to load
-     */
     void LoadScript(uint64_t assetID);
-    
-    /**
-     * @brief Saves the current visual script
-     */
     void SaveScript();
-    
-    /**
-     * @brief Saves the script to a new asset
-     * @param filepath Output file path
-     */
-    void SaveScriptAs(const std::string& filepath);
-    
-    /**
-     * @brief Gets the current script graph
-     * @return Reference to the script graph
-     */
-    FScriptGraph& GetGraph();
-    
-    /**
-     * @brief Checks if the script has unsaved changes
-     * @return true if modified
-     */
-    bool IsModified() const;
+    void NewScript(const std::string& name = "NewScript") { m_Graph = FScriptGraph(); m_Graph.Name = name; }
+    void SaveScriptAs(const std::string& /*filepath*/) {}
+    FScriptGraph& GetGraph() { return m_Graph; }
+    bool IsModified() const { return m_Graph.bIsModified; }
     
     //-------------------------------------------------------------------------
-    // Node Operations
+    // Node / Link / Selection / Debug / Templates / Config (all stubs)
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Creates a node from a template
-     * @param templateName Template class name
-     * @param position Position in graph
-     * @return Created node ID
-     */
-    uint64_t CreateNode(const std::string& templateName, const ImVec2& position);
-    
-    /**
-     * @brief Deletes a node
-     * @param nodeID Node to delete
-     */
-    void DeleteNode(uint64_t nodeID);
-    
-    /**
-     * @brief Deletes all selected nodes
-     */
-    void DeleteSelectedNodes();
-    
-    /**
-     * @brief Duplicates selected nodes
-     */
-    void DuplicateSelectedNodes();
-    
-    /**
-     * @brief Copies selected nodes to clipboard
-     */
-    void CopySelectedNodes();
-    
-    /**
-     * @brief Pastes nodes from clipboard
-     */
-    void PasteNodes();
-    
-    //-------------------------------------------------------------------------
-    // Link Operations
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Checks if a link can be created between two pins
-     * @param startPinID Source pin
-     * @param endPinID Destination pin
-     * @return true if connection is valid
-     */
-    bool CanCreateLink(uint64_t startPinID, uint64_t endPinID);
-    
-    /**
-     * @brief Creates a link between two pins
-     * @param startPinID Source pin
-     * @param endPinID Destination pin
-     * @return Created link ID
-     */
-    uint64_t CreateLink(uint64_t startPinID, uint64_t endPinID);
-    
-    /**
-     * @brief Deletes a link
-     * @param linkID Link to delete
-     */
-    void DeleteLink(uint64_t linkID);
-    
-    //-------------------------------------------------------------------------
-    // Selection
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Gets selected node IDs
-     * @return Vector of selected node IDs
-     */
-    std::vector<uint64_t> GetSelectedNodes() const;
-    
-    /**
-     * @brief Selects a node
-     * @param nodeID Node to select
-     * @param addToSelection Add to existing selection
-     */
-    void SelectNode(uint64_t nodeID, bool addToSelection = false);
-    
-    /**
-     * @brief Clears selection
-     */
-    void ClearSelection();
-    
-    /**
-     * @brief Selects all nodes
-     */
-    void SelectAll();
-    
-    //-------------------------------------------------------------------------
-    // Compile & Debug
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Compiles the script
-     * @return true if compilation succeeded
-     */
-    bool Compile();
-    
-    /**
-     * @brief Starts debugging the script
-     */
-    void StartDebugging();
-    
-    /**
-     * @brief Stops debugging
-     */
-    void StopDebugging();
-    
-    /**
-     * @brief Pauses/resumes debug execution
-     * @param paused Pause state
-     */
-    void SetDebugPaused(bool paused);
-    
-    /**
-     * @brief Steps to the next node
-     */
-    void StepDebug();
-    
-    /**
-     * @brief Checks if debugging is active
-     * @return Debug state
-     */
-    bool IsDebugging() const;
-    
-    //-------------------------------------------------------------------------
-    // Node Templates
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Registers a node template
-     * @param tmpl Node template definition
-     */
-    void RegisterNodeTemplate(const FNodeTemplate& tmpl);
-    
-    /**
-     * @brief Gets all registered node templates
-     * @return Vector of templates
-     */
-    const std::vector<FNodeTemplate>& GetNodeTemplates() const;
-    
-    /**
-     * @brief Finds a template by class name
-     * @param className Template class name
-     * @return Pointer to template (nullptr if not found)
-     */
-    const FNodeTemplate* FindTemplate(const std::string& className) const;
-    
-    //-------------------------------------------------------------------------
-    // Configuration
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Gets the panel state
-     * @return Reference to state struct
-     */
-    FVisualScriptState& GetState();
-    
-    /**
-     * @brief Sets auto-save enabled
-     * @param enabled Auto-save state
-     */
-    void SetAutoSaveEnabled(bool enabled);
-    
-    /**
-     * @brief Sets grid snapping
-     * @param enabled Snap state
-     */
-    void SetSnapToGrid(bool enabled);
+    uint64_t CreateNode(const std::string& /*templateName*/, const ImVec2& /*position*/) { return 0; }
+    void DeleteNode(uint64_t /*nodeID*/) {}
+    void DeleteSelectedNodes() {}
+    void DuplicateSelectedNodes() {}
+    void CopySelectedNodes() {}
+    void PasteNodes() {}
+    bool CanCreateLink(uint64_t /*startPinID*/, uint64_t /*endPinID*/) { return false; }
+    uint64_t CreateLink(uint64_t /*startPinID*/, uint64_t /*endPinID*/) { return 0; }
+    void DeleteLink(uint64_t /*linkID*/) {}
+    std::vector<uint64_t> GetSelectedNodes() const { return m_State.SelectedNodeIDs; }
+    void SelectNode(uint64_t nodeID, bool addToSelection = false) {
+        if (!addToSelection) m_State.SelectedNodeIDs.clear();
+        m_State.SelectedNodeIDs.push_back(nodeID);
+    }
+    void ClearSelection() { m_State.SelectedNodeIDs.clear(); }
+    void SelectAll() {}
+    bool Compile() { return false; }
+    void StartDebugging() { m_State.bIsDebugging = true; }
+    void StopDebugging() { m_State.bIsDebugging = false; }
+    void SetDebugPaused(bool paused) { m_State.bIsPaused = paused; }
+    void StepDebug() {}
+    bool IsDebugging() const { return m_State.bIsDebugging; }
+    void RegisterNodeTemplate(const FNodeTemplate& tmpl) { m_NodeTemplates.push_back(tmpl); }
+    const std::vector<FNodeTemplate>& GetNodeTemplates() const { return m_NodeTemplates; }
+    const FNodeTemplate* FindTemplate(const std::string& className) const {
+        for (auto& t : m_NodeTemplates) if (t.ClassName == className) return &t;
+        return nullptr;
+    }
+    FVisualScriptState& GetState() { return m_State; }
+    void SetAutoSaveEnabled(bool enabled) { m_State.bAutoSaveEnabled = enabled; }
+    void SetSnapToGrid(bool enabled) { m_State.bSnapToGrid = enabled; }
     
     //-------------------------------------------------------------------------
     // Callbacks
     //-------------------------------------------------------------------------
     
-    /** Called when script is modified */
     using ScriptModifiedCallback = std::function<void()>;
-    
-    /** Called when script is compiled */
     using CompileCallback = std::function<void(bool success, const std::string& message)>;
-    
-    /** Called when node is selected */
     using NodeSelectedCallback = std::function<void(uint64_t nodeID)>;
     
-    void SetOnScriptModified(ScriptModifiedCallback callback);
-    void SetOnCompile(CompileCallback callback);
-    void SetOnNodeSelected(NodeSelectedCallback callback);
-    
+    void SetOnScriptModified(ScriptModifiedCallback callback) { m_OnScriptModified = callback; }
+    void SetOnCompile(CompileCallback callback) { m_OnCompile = callback; }
+    void SetOnNodeSelected(NodeSelectedCallback callback) { m_OnNodeSelected = callback; }
+
+
 public:
     // Made public so static helper functions can access it
     static ed::EditorContext*   m_EditorContext;
@@ -542,9 +361,9 @@ private:
     FVisualScriptState          m_State;
     std::vector<FNodeTemplate>  m_NodeTemplates;
     
-    char                        m_SearchBuffer[256];
+    char                        m_SearchBuffer[256] = {};
     std::vector<FNodeTemplate>  m_SearchResults;
-    int                         m_SelectedSearchIndex;
+    int                         m_SelectedSearchIndex = -1;
     
     std::string                 m_ClipboardData;
     std::vector<std::string>    m_CompileErrors;
@@ -553,30 +372,6 @@ private:
     ScriptModifiedCallback      m_OnScriptModified;
     CompileCallback             m_OnCompile;
     NodeSelectedCallback        m_OnNodeSelected;
-    
-    //-------------------------------------------------------------------------
-    // Internal Methods
-    //-------------------------------------------------------------------------
-    
-    void DrawToolbar();
-    void DrawNodePalette();
-    void DrawNodeGraph();
-    void DrawDetailsPanel();
-    void DrawMinimap();
-    void DrawNodeSearchPopup();
-    void DrawDebugPanel();
-    
-    void DrawNode(FNode& node);
-    void DrawPin(const FPin& pin, bool isInput);
-    void DrawLink(const FLink& link);
-    void DrawNewLinkPreview();
-    
-    void InitializeNodeTemplates();
-    FNode CreateNodeFromTemplate(const FNodeTemplate& tmpl, const ImVec2& position);
-    
-    void HandleKeyboardShortcuts();
-    void HandleContextMenu();
-    void UpdateDebugState();
 };
 
 //=============================================================================
