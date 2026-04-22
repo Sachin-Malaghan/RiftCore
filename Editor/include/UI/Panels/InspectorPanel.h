@@ -12,13 +12,14 @@
  */
 
 #include <RiftCore/Scene/ISceneSystem.h>
-#include <UI/Commands/CommandBuffer.h>
+#include <Renderer/HUD.h>  // For CommandBuffer (consolidated UI system)
 #include <vector>
 #include <string>
 #include <functional>
 #include <any>
 #include <cstdint>
 #include <unordered_map>
+#include <algorithm>
 
 namespace RiftCore::UI {
 
@@ -132,15 +133,22 @@ struct FComponentInfo {
  * @brief Current state of the inspector
  */
 struct FInspectorState {
-    bool            bLocked;        ///< Lock to current selection
-    bool            bShowAdvanced;  ///< Show advanced properties
-    bool            bShowReadOnly;  ///< Show read-only properties
-    bool            bShowCategories;///< Group by category
-    std::string     SearchFilter;   ///< Property search
+    bool            bLocked;            ///< Lock to current selection
+    bool            bLockSelection;     ///< Lock selection (alias)
+    bool            bShowAdvanced;      ///< Show advanced properties
+    bool            bShowReadOnly;      ///< Show read-only properties
+    bool            bShowCategories;    ///< Group by category
+    std::string     SearchFilter;       ///< Property search
+    char            SearchBuffer[256];  ///< Search input buffer
+    SceneNodeID     LockedNodeID;       ///< Locked node ID when selection locked
+    float           LabelWidth;         ///< Label column width
+    std::unordered_map<uint64_t, bool> ComponentExpanded; ///< Component expanded states
     
     FInspectorState()
-        : bLocked(false), bShowAdvanced(false),
-          bShowReadOnly(true), bShowCategories(true) {}
+        : bLocked(false), bLockSelection(false), bShowAdvanced(false),
+          bShowReadOnly(true), bShowCategories(true), LockedNodeID(0), LabelWidth(120.0f) {
+        SearchBuffer[0] = '\0';
+    }
 };
 
 //=============================================================================
@@ -324,12 +332,13 @@ private:
     // Component Drawing
     //-------------------------------------------------------------------------
     
-    void DrawToolbar();
-    void DrawNodeHeader();
+    void DrawToolbar(ISceneNode* node);
+    void DrawNodeHeader(ISceneNode* node);
     void DrawComponents();
     void DrawComponentSection(FComponentInfo& component);
-    void DrawAddComponentButton();
+    void DrawAddComponentButton(ISceneNode* node, CommandBuffer& cb);
     void DrawAddComponentMenu();
+    void DrawNoSelectionPlaceholder();
     
     //-------------------------------------------------------------------------
     // Built-in Component Drawers
