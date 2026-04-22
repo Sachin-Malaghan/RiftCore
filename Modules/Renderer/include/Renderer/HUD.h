@@ -32,6 +32,7 @@
 
 struct GLFWwindow;
 struct ImFont;
+struct ImGuiContext;
 
 #ifdef RENDERER_EXPORTS
     #define RENDERER_API RIFTCORE_EXPORT
@@ -395,6 +396,13 @@ public:
      * @brief Get the GLFW window
      */
     GLFWwindow* GetWindow() const { return m_Window; }
+
+    /**
+     * @brief Get the ImGui context created by this HUD.
+     * Call ImGui::SetCurrentContext() with this in any DLL that
+     * needs to use ImGui but doesn't own the context.
+     */
+    RENDERER_API ImGuiContext* GetImGuiContext() const;
 
 private:
     //=========================================================================
