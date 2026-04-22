@@ -136,6 +136,14 @@ inline EShowFlag operator&(EShowFlag a, EShowFlag b) {
     return static_cast<EShowFlag>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
 }
 
+inline EShowFlag operator|(EShowFlag a, uint32_t b) {
+    return static_cast<EShowFlag>(static_cast<uint32_t>(a) | b);
+}
+
+inline EShowFlag operator&(EShowFlag a, uint32_t b) {
+    return static_cast<EShowFlag>(static_cast<uint32_t>(a) & b);
+}
+
 inline EShowFlag& operator|=(EShowFlag& a, EShowFlag b) {
     a = a | b;
     return a;
@@ -143,6 +151,16 @@ inline EShowFlag& operator|=(EShowFlag& a, EShowFlag b) {
 
 inline EShowFlag& operator&=(EShowFlag& a, EShowFlag b) {
     a = a & b;
+    return a;
+}
+
+inline EShowFlag& operator|=(EShowFlag& a, uint32_t b) {
+    a = static_cast<EShowFlag>(static_cast<uint32_t>(a) | b);
+    return a;
+}
+
+inline EShowFlag& operator&=(EShowFlag& a, uint32_t b) {
+    a = static_cast<EShowFlag>(static_cast<uint32_t>(a) & b);
     return a;
 }
 
