@@ -206,14 +206,12 @@ namespace { namespace ConsoleFn {
 
 void ConsolePanel::OnUIRender() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    
-    if (!ImGui::Begin("Console", nullptr, ImGuiWindowFlags_MenuBar)) {
+    bool windowOpen = ImGui::Begin("Console", nullptr, ImGuiWindowFlags_MenuBar);
+    ImGui::PopStyleVar();
+    if (!windowOpen) {
         ImGui::End();
-        ImGui::PopStyleVar();
         return;
     }
-    
-    ImGui::PopStyleVar();
     
     // Menu bar
     if (ImGui::BeginMenuBar()) {
