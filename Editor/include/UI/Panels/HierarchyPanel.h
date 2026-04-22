@@ -153,18 +153,20 @@ struct FHierarchyState {
     ENodeSortMode                   SortMode;               ///< Current sort mode
     uint64_t                        RenamingNodeID;         ///< Node being renamed
     uint64_t                        LastClickedNodeID;      ///< For double-click detection
+    uint64_t                        FocusedNodeID;          ///< Currently focused node ID
     float                           LastClickTime;          ///< Time of last click
     bool                            bNeedsRefresh;          ///< Needs hierarchy refresh
     bool                            bNeedsRefilter;         ///< Needs filter reapplication
     bool                            bShowHiddenNodes;       ///< Show hidden nodes
     bool                            bShowLockedNodes;       ///< Show locked nodes
     bool                            bShowTypeFilter;        ///< Show type filter dropdown
+    bool                            bSortAscending;         ///< Sort in ascending order
     
     FHierarchyState()
         : SortMode(ENodeSortMode::CreationOrder), RenamingNodeID(0),
-          LastClickedNodeID(0), LastClickTime(0.0f), bNeedsRefresh(true),
+          LastClickedNodeID(0), FocusedNodeID(0), LastClickTime(0.0f), bNeedsRefresh(true),
           bNeedsRefilter(false), bShowHiddenNodes(true), bShowLockedNodes(true),
-          bShowTypeFilter(false) {
+          bShowTypeFilter(false), bSortAscending(true) {
         SearchBuffer[0] = '\0';
         RenameBuffer[0] = '\0';
     }
@@ -227,6 +229,12 @@ public:
     SceneNodeID GetSelectedNode() const;
     
     /**
+     * @brief Gets the primary selected node as uint64_t
+     * @return Selected node ID (0 if none)
+     */
+    uint64_t GetSelectedNodeID() const;
+    
+    /**
      * @brief Gets all selected nodes
      * @return Vector of selected node IDs
      */
@@ -238,6 +246,12 @@ public:
      * @param addToSelection If true, adds to existing selection
      */
     void SetSelectedNode(SceneNodeID nodeID, bool addToSelection = false);
+    
+    /**
+     * @brief Sets the selected node (uint64_t version)
+     * @param nodeID Node to select
+     */
+    void SetSelectedNode(uint64_t nodeID);
     
     /**
      * @brief Clears all selection
