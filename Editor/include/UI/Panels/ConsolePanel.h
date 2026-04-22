@@ -90,17 +90,17 @@ struct FLogEntry {
     std::string     Message;        ///< Log message text
     std::string     Source;         ///< Source file/function
     std::string     SourceFile;     ///< Source file name
+    std::string     Category;       ///< Category name as string
     uint32_t        SourceLine;     ///< Source line number
     ELogVerbosity   Verbosity;      ///< Severity level
-    ELogCategory    Category;       ///< System category
-    ELogCategory    CategoryType;   ///< Category type (alias)
+    ELogCategory    CategoryType;   ///< Category type enum
     double          Timestamp;      ///< Time since startup
     uint32_t        FrameNumber;    ///< Frame when logged
     uint32_t        RepeatCount;    ///< Consecutive repeat count
     bool            bIsCollapsed;   ///< Collapsed with repeats
     
     FLogEntry()
-        : ID(0), SourceLine(0), Verbosity(ELogVerbosity::Info), Category(ELogCategory::Core),
+        : ID(0), SourceLine(0), Verbosity(ELogVerbosity::Info),
           CategoryType(ELogCategory::Core), Timestamp(0.0), FrameNumber(0), RepeatCount(1), bIsCollapsed(false) {}
 };
 
@@ -232,7 +232,7 @@ public:
      * @brief Adds a simple log message
      * @param msg Message text
      */
-    void AddLog(const std::string& msg);
+    static void AddLog(const std::string& msg);
     
     /**
      * @brief Adds a log message with verbosity and category
@@ -240,7 +240,7 @@ public:
      * @param verbosity Severity level
      * @param category Category name string
      */
-    void AddLog(const std::string& msg, ELogVerbosity verbosity, const std::string& category);
+    static void AddLog(const std::string& msg, ELogVerbosity verbosity, const std::string& category);
     
     /**
      * @brief Adds a log message with full metadata
