@@ -111,6 +111,7 @@ static void DeleteLink(uint64_t linkID);
 static void HandleKeyboardShortcuts();
 static void HandleContextMenu();
 static void UpdateDebugState();
+static void SaveScript();
 
 static ImVec4 GetPinColor(EPinType type);
 static const char* GetPinTypeName(EPinType type);
@@ -190,6 +191,14 @@ void VisualScriptingPanel::LoadScript(uint64_t assetID) {
     // This would normally come from the loaded asset
     
     // LOG_INFO("VisualScriptingPanel", "Loaded script: %s", s_CurrentGraph.Name.c_str());
+}
+
+/**
+ * @brief Internal static save helper (called by free DrawToolbar)
+ */
+static void SaveScript() {
+    s_CurrentGraph.bIsModified = false;
+    s_State.TimeSinceLastSave = 0.0f;
 }
 
 /**
