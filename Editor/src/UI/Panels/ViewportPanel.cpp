@@ -131,13 +131,13 @@ void ViewportPanel::OnUIRender(uint32_t sceneTextureID, const ImVec2& viewportSi
         windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize;
     }
     
-    if (!ImGui::Begin("Viewport", nullptr, windowFlags)) {
+    bool windowOpen = ImGui::Begin("Viewport", nullptr, windowFlags);
+    ImGui::PopStyleVar(); // always pop immediately after Begin, before any return
+    
+    if (!windowOpen) {
         ImGui::End();
-        ImGui::PopStyleVar();
         return;
     }
-    
-    ImGui::PopStyleVar();
     
     // Track focus and hover state
     s_State.bIsFocused = ImGui::IsWindowFocused();
@@ -213,7 +213,6 @@ void ViewportPanel::OnUIRender(uint32_t sceneTextureID, const ImVec2& viewportSi
     }
     
     // === Transform Gizmo ===
-    // ImGuizmo setup
     ImGuizmo::SetOrthographic(s_State.Camera.Mode != ECameraMode::Perspective);
     ImGuizmo::SetDrawlist(drawList);
     ImGuizmo::SetRect(imageMin.x, imageMin.y, s_State.ViewportSize.x, s_State.ViewportSize.y);
