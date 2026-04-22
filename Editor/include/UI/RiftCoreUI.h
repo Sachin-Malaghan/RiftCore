@@ -11,16 +11,6 @@
  */
 
 #include <Renderer/HUD.h>
-#include <imgui.h>
-
-namespace RiftCore::UI {
-    /**
-     * @brief Must be called once after HUD::Initialize() from main.cpp.
-     * Propagates the ImGui context from the Renderer DLL into this UI DLL
-     * so all panels can call ImGui functions safely.
-     */
-    void InitPanelImGuiContext(ImGuiContext* ctx);
-}
 
 // Compatibility alias - RiftCoreUI is now just an alias for HUD
 namespace RiftCore::UI {
