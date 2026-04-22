@@ -74,7 +74,9 @@ enum class ERenderMode : uint8_t {
     Normals,            ///< Normal vectors
     UV,                 ///< UV coordinates
     VertexColors,       ///< Vertex color display
-    Overdraw            ///< Overdraw visualization
+    Overdraw,           ///< Overdraw visualization
+    QuadOverdraw,       ///< Quad overdraw visualization
+    LightmapDensity     ///< Lightmap density visualization
 };
 
 /**
@@ -132,6 +134,20 @@ inline EShowFlag operator|(EShowFlag a, EShowFlag b) {
 
 inline EShowFlag operator&(EShowFlag a, EShowFlag b) {
     return static_cast<EShowFlag>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+}
+
+inline EShowFlag& operator|=(EShowFlag& a, EShowFlag b) {
+    a = a | b;
+    return a;
+}
+
+inline EShowFlag& operator&=(EShowFlag& a, EShowFlag b) {
+    a = a & b;
+    return a;
+}
+
+inline EShowFlag operator~(EShowFlag a) {
+    return static_cast<EShowFlag>(~static_cast<uint32_t>(a));
 }
 
 //=============================================================================
@@ -519,11 +535,11 @@ private:
     void DrawCameraModeMenu();
     void DrawSnapSettings();
     void DrawStatsOverlay();
-    void DrawOrientationGizmo();
+    void DrawOrientationGizmo(const ImVec2& position, float size);
     void DrawPlayControls();
     
     void HandleCameraInput();
-    void HandleMousePicking();
+    void HandleMousePicking(const ImVec2& mousePos);
     void HandleKeyboardShortcuts();
     void UpdateGizmo();
     void UpdateMatrices();
