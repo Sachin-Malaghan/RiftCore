@@ -44,7 +44,9 @@ enum class EGizmoMode : uint8_t {
     Translate,      ///< Move objects
     Rotate,         ///< Rotate objects
     Scale,          ///< Scale objects
-    Universal       ///< Combined transform
+    Universal,      ///< Combined transform
+    Bounds,         ///< Bounds editing mode
+    COUNT           ///< Number of modes
 };
 
 /**
@@ -115,6 +117,10 @@ enum class EShowFlag : uint32_t {
     AntiAliasing    = 1 << 17,  ///< Anti-aliasing
     Shadows         = 1 << 18,  ///< Shadow rendering
     Reflections     = 1 << 19,  ///< Reflections
+    Lights          = 1 << 20,  ///< Light icons/gizmos
+    Cameras         = 1 << 21,  ///< Camera icons
+    Icons           = 1 << 22,  ///< Component icons
+    Stats           = 1 << 23,  ///< Statistics overlay
     
     // Default flags
     Default = Grid | Axis | Shadows | AO | AntiAliasing
@@ -162,16 +168,20 @@ struct FViewportCamera {
  */
 struct FRenderStats {
     float           FrameTimeMS;    ///< Frame time in ms
+    float           FrameTimeMs;    ///< Frame time in ms (alias)
+    float           GPUTimeMs;      ///< GPU time in ms
     float           FPS;            ///< Frames per second
     uint32_t        DrawCalls;      ///< Draw call count
     uint32_t        Triangles;      ///< Triangle count
     uint32_t        Vertices;       ///< Vertex count
     uint32_t        TextureMemMB;   ///< Texture memory
     uint32_t        MeshMemMB;      ///< Mesh memory
+    uint64_t        VRAMUsedMB;     ///< VRAM used
+    uint64_t        VRAMTotalMB;    ///< Total VRAM
     
     FRenderStats()
-        : FrameTimeMS(0), FPS(0), DrawCalls(0), Triangles(0),
-          Vertices(0), TextureMemMB(0), MeshMemMB(0) {}
+        : FrameTimeMS(0), FrameTimeMs(0), GPUTimeMs(0), FPS(0), DrawCalls(0), Triangles(0),
+          Vertices(0), TextureMemMB(0), MeshMemMB(0), VRAMUsedMB(0), VRAMTotalMB(0) {}
 };
 
 /**
@@ -179,25 +189,47 @@ struct FRenderStats {
  * @brief Complete viewport state
  */
 struct FViewportState {
-    EGizmoMode      GizmoMode;      ///< Current gizmo mode
-    EGizmoSpace     GizmoSpace;     ///< Gizmo coordinate space
-    ERenderMode     RenderMode;     ///< Visualization mode
-    EShowFlag       ShowFlags;      ///< Display flags
-    float           GridSize;       ///< Grid cell size
-    float           SnapTranslate;  ///< Position snap
-    float           SnapRotate;     ///< Rotation snap (degrees)
-    float           SnapScale;      ///< Scale snap
-    bool            bSnapEnabled;   ///< Snapping active
-    bool            bShowStats;     ///< Show statistics
-    bool            bShowGizmo;     ///< Show transform gizmo
-    bool            bIsPlaying;     ///< Play-in-editor mode
+    EGizmoMode      GizmoMode;          ///< Current gizmo mode
+    EGizmoSpace     GizmoSpace;         ///< Gizmo coordinate space
+    ERenderMode     RenderMode;         ///< Visualization mode
+    EShowFlag       ShowFlags;          ///< Display flags
+    float           GridSize;           ///< Grid cell size
+    float           SnapTranslate;      ///< Position snap
+    float           SnapRotate;         ///< Rotation snap (degrees)
+    float           SnapScale;          ///< Scale snap
+    bool            bSnapEnabled;       ///< Snapping active
+    bool            bGizmoSnap;         ///< Gizmo snap enabled
+    bool            bShowStats;         ///< Show statistics
+    bool            bShowGizmo;         ///< Show transform gizmo
+    bool            bShowToolbar;       ///< Show top toolbar
+    bool            bShowTelemetry;     ///< Show performance overlay
+    bool            bShowGizmoControls; ///< Show gizmo controls
+    bool            bIsPlaying;         ///< Play-in-editor mode
+    bool            bRealtime;          ///< Realtime rendering
+    bool            bMaximized;         ///< Viewport maximized
+    bool            bIsFocused;         ///< Viewport has focus
+    bool            bIsHovered;         ///< Mouse is hovering
+    bool            bDraggingGizmo;     ///< Gizmo being dragged
+    bool            bCameraControlActive; ///< Camera being controlled
+    ImVec2          ViewportSize;       ///< Current viewport size
+    ImVec2          ViewportPos;        ///< Viewport screen position
+    float           LastMouseX;         ///< Previous mouse X
+    float           LastMouseY;         ///< Previous mouse Y
+    FViewportCamera Camera;             ///< Camera state
+    FRenderStats    Stats;              ///< Render statistics
     
     FViewportState()
         : GizmoMode(EGizmoMode::Translate), GizmoSpace(EGizmoSpace::World),
           RenderMode(ERenderMode::Lit), ShowFlags(EShowFlag::Default),
           GridSize(1.0f), SnapTranslate(1.0f), SnapRotate(15.0f),
-          SnapScale(0.1f), bSnapEnabled(false), bShowStats(true),
-          bShowGizmo(true), bIsPlaying(false) {}
+          SnapScale(0.1f), bSnapEnabled(false), bGizmoSnap(false),
+          bShowStats(true), bShowGizmo(true), bShowToolbar(true),
+          bShowTelemetry(false), bShowGizmoControls(true),
+          bIsPlaying(false), bRealtime(true),
+          bMaximized(false), bIsFocused(false), bIsHovered(false),
+          bDraggingGizmo(false), bCameraControlActive(false),
+          ViewportSize(1280, 720), ViewportPos(0, 0),
+          LastMouseX(0.0f), LastMouseY(0.0f) {}
 };
 
 //=============================================================================
@@ -490,7 +522,7 @@ private:
     void DrawOrientationGizmo();
     void DrawPlayControls();
     
-    void HandleCameraInput(float deltaTime);
+    void HandleCameraInput();
     void HandleMousePicking();
     void HandleKeyboardShortcuts();
     void UpdateGizmo();
