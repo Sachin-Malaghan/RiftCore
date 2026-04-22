@@ -240,6 +240,9 @@ void VisualScriptingPanel::SaveScript() {
  * └──────────────┴────────────────────────────────────────┴───────────────┘
  */
 void VisualScriptingPanel::OnUIRender() {
+    static ImGuiContext* s_Ctx = ImGui::GetCurrentContext();
+    if (!s_Ctx) return;
+    ImGui::SetCurrentContext(s_Ctx);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     bool windowOpen = ImGui::Begin("Visual Scripting", nullptr, ImGuiWindowFlags_MenuBar);
     ImGui::PopStyleVar();
