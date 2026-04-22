@@ -147,13 +147,12 @@ static std::string FormatTimestamp(uint64_t timestamp);
  */
 void AssetBrowserPanel::OnUIRender() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    
-    if (!ImGui::Begin("Content Browser", nullptr, ImGuiWindowFlags_MenuBar)) {
+    bool windowOpen = ImGui::Begin("Content Browser", nullptr, ImGuiWindowFlags_MenuBar);
+    ImGui::PopStyleVar();
+    if (!windowOpen) {
         ImGui::End();
-        ImGui::PopStyleVar();
         return;
     }
-    ImGui::PopStyleVar();
     
     // Process keyboard shortcuts (Ctrl+F, Delete, F5, etc.)
     HandleKeyboardShortcuts();
