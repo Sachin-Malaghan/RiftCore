@@ -168,6 +168,22 @@ inline EShowFlag operator~(EShowFlag a) {
     return static_cast<EShowFlag>(~static_cast<uint32_t>(a));
 }
 
+inline bool operator!=(EShowFlag a, EShowFlag b) {
+    return static_cast<uint32_t>(a) != static_cast<uint32_t>(b);
+}
+
+inline bool operator==(EShowFlag a, EShowFlag b) {
+    return static_cast<uint32_t>(a) == static_cast<uint32_t>(b);
+}
+
+inline bool operator!=(EShowFlag a, uint32_t b) {
+    return static_cast<uint32_t>(a) != b;
+}
+
+inline bool operator==(EShowFlag a, uint32_t b) {
+    return static_cast<uint32_t>(a) == b;
+}
+
 //=============================================================================
 // DATA STRUCTURES
 //=============================================================================
