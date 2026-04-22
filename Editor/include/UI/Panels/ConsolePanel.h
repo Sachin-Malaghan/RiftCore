@@ -17,6 +17,7 @@
 #include <functional>
 #include <cstdint>
 #include <mutex>
+#include <imgui.h>
 
 namespace RiftCore::UI {
 
@@ -34,7 +35,8 @@ enum class ELogVerbosity : uint8_t {
     Info,           ///< Informational messages
     Warning,        ///< Warning messages
     Error,          ///< Error messages
-    Fatal           ///< Fatal/crash messages
+    Fatal,          ///< Fatal/crash messages
+    COUNT           ///< Number of verbosity levels
 };
 
 /**
@@ -50,6 +52,7 @@ enum class ELogCategory : uint8_t {
     Scripting,      ///< Scripting/Blueprints
     Network,        ///< Networking
     Assets,         ///< Asset management
+    Asset,          ///< Asset (alias for Assets)
     Editor,         ///< Editor-specific
     Game,           ///< Game logic
     Custom,         ///< User-defined
@@ -68,16 +71,19 @@ struct FLogEntry {
     uint64_t        ID;             ///< Unique message ID
     std::string     Message;        ///< Log message text
     std::string     Source;         ///< Source file/function
+    std::string     SourceFile;     ///< Source file name
+    uint32_t        SourceLine;     ///< Source line number
     ELogVerbosity   Verbosity;      ///< Severity level
     ELogCategory    Category;       ///< System category
+    ELogCategory    CategoryType;   ///< Category type (alias)
     double          Timestamp;      ///< Time since startup
     uint32_t        FrameNumber;    ///< Frame when logged
     uint32_t        RepeatCount;    ///< Consecutive repeat count
     bool            bIsCollapsed;   ///< Collapsed with repeats
     
     FLogEntry()
-        : ID(0), Verbosity(ELogVerbosity::Info), Category(ELogCategory::Core),
-          Timestamp(0.0), FrameNumber(0), RepeatCount(1), bIsCollapsed(false) {}
+        : ID(0), SourceLine(0), Verbosity(ELogVerbosity::Info), Category(ELogCategory::Core),
+          CategoryType(ELogCategory::Core), Timestamp(0.0), FrameNumber(0), RepeatCount(1), bIsCollapsed(false) {}
 };
 
 /**
@@ -96,6 +102,23 @@ struct FConsoleFilter {
         for (size_t i = 0; i < static_cast<size_t>(ELogCategory::COUNT); ++i) {
             CategoryFilters[i] = true;
         }
+    }
+};
+
+/**
+ * @struct FConsoleState
+ * @brief Runtime state of the console panel
+ */
+struct FConsoleState {
+    char            InputBuffer[1024];      ///< Command input buffer
+    std::vector<std::string> CommandHistory;///< Command history
+    int             HistoryPos;             ///< Current position in history
+    bool            bScrollToBottom;        ///< Should scroll to bottom
+    bool            bAutoScroll;            ///< Auto-scroll enabled
+    
+    FConsoleState()
+        : HistoryPos(-1), bScrollToBottom(false), bAutoScroll(true) {
+        InputBuffer[0] = '\0';
     }
 };
 
@@ -164,6 +187,14 @@ public:
      * @param msg Message text
      */
     void AddLog(const std::string& msg);
+    
+    /**
+     * @brief Adds a log message with verbosity and category
+     * @param msg Message text
+     * @param verbosity Severity level
+     * @param category Category name string
+     */
+    void AddLog(const std::string& msg, ELogVerbosity verbosity, const std::string& category);
     
     /**
      * @brief Adds a log message with full metadata
@@ -335,8 +366,8 @@ private:
 /** Gets the display name for a verbosity level */
 const char* GetVerbosityName(ELogVerbosity verbosity);
 
-/** Gets the color for a verbosity level */
-uint32_t GetVerbosityColor(ELogVerbosity verbosity);
+/** Gets the color for a verbosity level (as ImVec4) */
+ImVec4 GetVerbosityColor(ELogVerbosity verbosity);
 
 /** Gets the display name for a category */
 const char* GetCategoryName(ELogCategory category);
