@@ -59,6 +59,24 @@ enum class ELogCategory : uint8_t {
     COUNT
 };
 
+// Operators for ELogCategory to support iteration and arithmetic
+inline ELogCategory operator+(ELogCategory a, int b) {
+    return static_cast<ELogCategory>(static_cast<uint8_t>(a) + b);
+}
+
+inline ELogCategory operator+(int a, ELogCategory b) {
+    return static_cast<ELogCategory>(a + static_cast<uint8_t>(b));
+}
+
+inline ELogCategory& operator++(ELogCategory& a) {
+    a = static_cast<ELogCategory>(static_cast<uint8_t>(a) + 1);
+    return a;
+}
+
+inline int operator-(ELogCategory a, ELogCategory b) {
+    return static_cast<int>(static_cast<uint8_t>(a)) - static_cast<int>(static_cast<uint8_t>(b));
+}
+
 //=============================================================================
 // DATA STRUCTURES
 //=============================================================================
