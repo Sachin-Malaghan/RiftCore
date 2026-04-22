@@ -62,12 +62,16 @@ bool HUD::Initialize(GLFWwindow* window, const HUDConfig& config) {
     ImGuiIO& io = ImGui::GetIO();
     
     // Enable docking and viewports
+#ifdef IMGUI_HAS_DOCK
     if (config.EnableDocking) {
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     }
+#endif
+#ifdef IMGUI_HAS_VIEWPORT
     if (config.EnableViewports) {
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     }
+#endif
     
     // Keyboard navigation (disabled by default for game input)
     if (!config.EnableKeyboardNav) {
@@ -77,9 +81,11 @@ bool HUD::Initialize(GLFWwindow* window, const HUDConfig& config) {
     // Disable automatic ini file saving (we manage layout manually)
     io.IniFilename = nullptr;
     
+#ifdef IMGUI_HAS_VIEWPORT
     // Configure viewports
     io.ConfigViewportsNoAutoMerge = false;
     io.ConfigViewportsNoTaskBarIcon = false;
+#endif
 
     // ── Apply Theme ─────────────────────────────────────────
     if (config.DarkTheme) {
@@ -206,8 +212,10 @@ void HUD::ApplyDarkTheme() {
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.15f, 0.25f, 0.40f, 1.00f);
     
     // Docking
+#ifdef IMGUI_HAS_DOCK
     colors[ImGuiCol_DockingPreview]     = ImVec4(0.25f, 0.50f, 0.85f, 0.70f);
     colors[ImGuiCol_DockingEmptyBg]     = ImVec4(0.08f, 0.08f, 0.10f, 1.00f);
+#endif
     
     // Headers
     colors[ImGuiCol_Header]             = ImVec4(0.18f, 0.30f, 0.50f, 0.80f);
@@ -368,12 +376,16 @@ void HUD::EndFrame() {
 
     // Handle multi-viewport rendering
     ImGuiIO& io = ImGui::GetIO();
+#ifdef IMGUI_HAS_VIEWPORT
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         GLFWwindow* backup_context = glfwGetCurrentContext();
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
         glfwMakeContextCurrent(backup_context);
     }
+#else
+    (void)io;
+#endif
 
     m_FirstFrame = false;
 }
@@ -389,12 +401,16 @@ void HUD::RenderMainDockspace() {
     // Position window to cover entire viewport (below menu bar)
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
+#ifdef IMGUI_HAS_VIEWPORT
     ImGui::SetNextWindowViewport(viewport->ID);
+#endif
     
     // Configure host window
     ImGuiWindowFlags windowFlags = 
         ImGuiWindowFlags_MenuBar |
+#ifdef IMGUI_HAS_DOCK
         ImGuiWindowFlags_NoDocking |
+#endif
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoResize |
@@ -412,6 +428,7 @@ void HUD::RenderMainDockspace() {
 
     // Create dockspace
     ImGuiIO& io = ImGui::GetIO();
+#ifdef IMGUI_HAS_DOCK
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
         m_DockspaceID = ImGui::GetID("RiftCoreDockSpace");
         ImGui::DockSpace(m_DockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
@@ -421,6 +438,9 @@ void HUD::RenderMainDockspace() {
             SetupDockspace();
         }
     }
+#else
+    (void)io;
+#endif
 
     // Render menu bar and toolbar
     RenderMenuBar();
@@ -430,6 +450,7 @@ void HUD::RenderMainDockspace() {
 }
 
 void HUD::SetupDockspace() {
+#ifdef IMGUI_HAS_DOCK
     ImGuiID dockspaceID = m_DockspaceID;
     
     // Reset any existing layout
@@ -457,6 +478,7 @@ void HUD::SetupDockspace() {
     ImGui::DockBuilderDockWindow("Visual Scripting", dockBottom);
     
     ImGui::DockBuilderFinish(dockspaceID);
+#endif
 }
 
 //=============================================================================
