@@ -148,14 +148,12 @@ static void EndPropertyRow();
  */
 void InspectorPanel::OnUIRender(ISceneNode* node, CommandBuffer& cb) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    
-    if (!ImGui::Begin("Details", nullptr, ImGuiWindowFlags_MenuBar)) {
+    bool windowOpen = ImGui::Begin("Details", nullptr, ImGuiWindowFlags_MenuBar);
+    ImGui::PopStyleVar();
+    if (!windowOpen) {
         ImGui::End();
-        ImGui::PopStyleVar();
         return;
     }
-    
-    ImGui::PopStyleVar();
     
     // Determine which node to display
     ISceneNode* displayNode = s_State.bLockSelection ? 
