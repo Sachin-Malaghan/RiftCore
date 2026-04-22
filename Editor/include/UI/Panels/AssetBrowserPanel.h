@@ -81,7 +81,9 @@ enum class EAssetSortMode : uint8_t {
 enum class EViewMode : uint8_t {
     Grid,
     List,
-    Columns
+    Columns,
+    Tiles,          ///< Tile view mode
+    COUNT           ///< Number of view modes
 };
 
 //=============================================================================
