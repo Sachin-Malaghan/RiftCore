@@ -236,13 +236,21 @@ struct FVisualScriptState {
     float                   TimeSinceLastSave;  ///< Time since save
     bool                    bAutoSaveEnabled;   ///< Auto-save enabled
     
+    // Search state
+    char                    SearchBuffer[256];      ///< Node search buffer
+    std::vector<FNodeTemplate> SearchResults;       ///< Filtered search results
+    int                     SelectedSearchIndex;    ///< Selected result index
+    
     FVisualScriptState()
         : HoveredNodeID(0), HoveredPinID(0), bIsCreatingLink(false),
           NewLinkStartPin(0), bShowNewNodeMenu(false), bShowNodePalette(false),
           bIsDebugging(false), bIsPaused(false), CurrentExecutingNode(0),
           Zoom(1.0f), bShowMinimap(true), bShowDetails(true),
           DetailsPanelWidth(250.0f), bSnapToGrid(true), bShowGrid(true),
-          TimeSinceLastSave(0.0f), bAutoSaveEnabled(true) {}
+          TimeSinceLastSave(0.0f), bAutoSaveEnabled(true),
+          SelectedSearchIndex(-1) {
+        SearchBuffer[0] = '\0';
+    }
 };
 
 //=============================================================================
@@ -567,6 +575,13 @@ private:
     void HandleContextMenu();
     void UpdateDebugState();
 };
+
+//=============================================================================
+// FREE FUNCTIONS
+//=============================================================================
+
+/** Saves the current visual script (free function version) */
+void SaveScript();
 
 //=============================================================================
 // UTILITY FUNCTIONS
