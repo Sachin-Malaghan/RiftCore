@@ -402,7 +402,7 @@ public:
      * Call ImGui::SetCurrentContext() with this in any DLL that
      * needs to use ImGui but doesn't own the context.
      */
-    RENDERER_API ImGuiContext* GetImGuiContext() const;
+    ImGuiContext* GetImGuiContext() const;
 
 private:
     //=========================================================================
