@@ -36,6 +36,7 @@ namespace RiftCore::UI {
 enum class EAssetType : uint8_t {
     Unknown = 0,
     Folder,
+    Texture,        ///< Generic texture
     Texture2D,
     TextureCube,
     Material,
@@ -51,6 +52,7 @@ enum class EAssetType : uint8_t {
     Font,
     ParticleSystem,
     PhysicsMaterial,
+    Tiles,          ///< Tile assets
     COUNT
 };
 
@@ -65,6 +67,8 @@ enum class EAssetSortMode : uint8_t {
     Type_Descending,
     Size_Ascending,
     Size_Descending,
+    Size_Largest,       ///< Largest first
+    Size_Smallest,      ///< Smallest first
     DateModified_Newest,
     DateModified_Oldest
 };
@@ -89,8 +93,10 @@ enum class EViewMode : uint8_t {
  */
 struct FAssetEntry {
     uint64_t        ID;             ///< Unique asset identifier
+    uint64_t        AssetID;        ///< Alternative asset identifier
     std::string     Name;           ///< Display name
-    std::string     Path;           ///< Full path from root
+    std::string     Path;           ///< Relative path from root
+    std::string     FullPath;       ///< Full absolute path
     std::string     Extension;      ///< File extension
     EAssetType      Type;           ///< Asset type category
     uint64_t        SizeBytes;      ///< File size in bytes
@@ -98,11 +104,13 @@ struct FAssetEntry {
     bool            bIsDirectory;   ///< True if this is a folder
     bool            bIsSelected;    ///< Currently selected
     bool            bIsRenaming;    ///< In rename mode
+    bool            bIsFavorite;    ///< Marked as favorite
     uint32_t        ThumbnailID;    ///< Cached thumbnail texture ID
     
     FAssetEntry() 
-        : ID(0), Type(EAssetType::Unknown), SizeBytes(0), LastModified(0),
-          bIsDirectory(false), bIsSelected(false), bIsRenaming(false), ThumbnailID(0) {}
+        : ID(0), AssetID(0), Type(EAssetType::Unknown), SizeBytes(0), LastModified(0),
+          bIsDirectory(false), bIsSelected(false), bIsRenaming(false), 
+          bIsFavorite(false), ThumbnailID(0) {}
 };
 
 /**
@@ -118,6 +126,43 @@ struct FAssetFilter {
     FAssetFilter() : bShowOnlyModified(false), bShowHiddenAssets(false) {
         for (size_t i = 0; i < static_cast<size_t>(EAssetType::COUNT); ++i) {
             TypeFilters[i] = true;
+        }
+    }
+};
+
+/**
+ * @struct FAssetBrowserState
+ * @brief Encapsulates all mutable state for the asset browser panel
+ */
+struct FAssetBrowserState {
+    std::string                     CurrentPath;        ///< Current browsing path
+    std::vector<std::string>        NavigationHistory;  ///< Path history for back/forward
+    int32_t                         HistoryIndex;       ///< Current position in history
+    float                           ThumbnailSize;      ///< Thumbnail size in grid view
+    float                           Padding;            ///< Padding between items
+    EViewMode                       ViewMode;           ///< Current view mode
+    EAssetSortMode                  SortMode;           ///< Current sort mode
+    char                            SearchBuffer[256];  ///< Search input buffer
+    bool                            bShowOnlyFavorites; ///< Show only favorites
+    std::vector<uint64_t>           SelectedAssetIDs;   ///< Currently selected assets
+    uint64_t                        LastClickedAssetID; ///< For double-click detection
+    float                           LastClickTime;      ///< Time of last click
+    bool                            bShowLeftPanel;     ///< Show folder tree panel
+    bool                            bShowFilters;       ///< Show filter panel
+    float                           LeftPanelWidth;     ///< Width of left panel
+    
+    FAssetBrowserState()
+        : HistoryIndex(-1), ThumbnailSize(96.0f), Padding(8.0f),
+          ViewMode(EViewMode::Grid), SortMode(EAssetSortMode::Name_Ascending),
+          bShowOnlyFavorites(false), LastClickedAssetID(0), LastClickTime(0.0f),
+          bShowLeftPanel(true), bShowFilters(true), LeftPanelWidth(200.0f) {
+        SearchBuffer[0] = '\0';
+        CurrentPath = "/";
+    }
+};
+
+// Closing brace removed - was duplicate
+// FAssetFilter closing handled above
         }
     }
 };
