@@ -14,12 +14,3 @@
 // All implementation is in HUD.cpp
 
 // This file can be safely removed from build once migration is complete
-
-#include <UI/Panels/RiftCoreUI.h>
-#include <imgui.h>
-
-namespace RiftCore::UI {
-    void InitPanelImGuiContext(ImGuiContext* ctx) {
-        ImGui::SetCurrentContext(ctx);
-    }
-}
