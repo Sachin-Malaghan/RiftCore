@@ -190,6 +190,20 @@ void ConsolePanel::AddLog(const std::string& msg, ELogVerbosity verbosity, const
  * │ Command Input                                        [Send] │
  * └─────────────────────────────────────────────────────────────┘
  */
+// Free-function aliases to force file-scope static lookup, bypassing any
+// same-named member declarations that may exist in older header revisions.
+namespace { namespace ConsoleFn {
+    inline void ClearLog()                    { ::RiftCore::UI::ClearLog(); }
+    inline void CopyToClipboard(bool sel)     { ::RiftCore::UI::CopyToClipboard(sel); }
+    inline void SaveLogToFile()               { ::RiftCore::UI::SaveLogToFile(); }
+    inline void ApplyFilters()                { ::RiftCore::UI::ApplyFilters(); }
+    inline void DrawToolbar()                 { ::RiftCore::UI::DrawToolbar(); }
+    inline void DrawFilterPanel()             { ::RiftCore::UI::DrawFilterPanel(); }
+    inline void DrawLogArea()                 { ::RiftCore::UI::DrawLogArea(); }
+    inline void DrawInputArea()               { ::RiftCore::UI::DrawInputArea(); }
+    inline void DrawSettingsPopup()           { ::RiftCore::UI::DrawSettingsPopup(); }
+}}
+
 void ConsolePanel::OnUIRender() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     
@@ -204,9 +218,9 @@ void ConsolePanel::OnUIRender() {
     // Menu bar
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("Console")) {
-            if (ImGui::MenuItem("Clear", "Ctrl+Shift+C")) ClearLog();
-            if (ImGui::MenuItem("Copy All", "Ctrl+C")) CopyToClipboard(false);
-            if (ImGui::MenuItem("Save to File...")) SaveLogToFile();
+            if (ImGui::MenuItem("Clear", "Ctrl+Shift+C")) ConsoleFn::ClearLog();
+            if (ImGui::MenuItem("Copy All", "Ctrl+C")) ConsoleFn::CopyToClipboard(false);
+            if (ImGui::MenuItem("Save to File...")) ConsoleFn::SaveLogToFile();
             ImGui::Separator();
             ImGui::MenuItem("Auto-Scroll", nullptr, &s_State.bAutoScroll);
             ImGui::MenuItem("Word Wrap", nullptr, &s_State.bWrapText);
@@ -226,13 +240,13 @@ void ConsolePanel::OnUIRender() {
     
     // Apply filters if needed
     if (s_State.bNeedsRefilter) {
-        ApplyFilters();
+        ConsoleFn::ApplyFilters();
         s_State.bNeedsRefilter = false;
     }
     
     // Toolbar
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 4));
-    DrawToolbar();
+    ConsoleFn::DrawToolbar();
     ImGui::PopStyleVar();
     
     ImGui::Separator();
@@ -244,7 +258,7 @@ void ConsolePanel::OnUIRender() {
     if (s_State.bShowFilters) {
         // Filter panel on left
         ImGui::BeginChild("FilterPanel", ImVec2(s_State.FilterPanelWidth, contentHeight), true);
-        DrawFilterPanel();
+        ConsoleFn::DrawFilterPanel();
         ImGui::EndChild();
         
         ImGui::SameLine();
@@ -253,15 +267,15 @@ void ConsolePanel::OnUIRender() {
     // Log area
     ImGui::BeginChild("LogArea", ImVec2(0, contentHeight), true, 
         s_State.bWrapText ? 0 : ImGuiWindowFlags_HorizontalScrollbar);
-    DrawLogArea();
+    ConsoleFn::DrawLogArea();
     ImGui::EndChild();
     
     // Command input area
-    DrawInputArea();
+    ConsoleFn::DrawInputArea();
     
     // Settings popup
     if (s_State.bShowSettings) {
-        DrawSettingsPopup();
+        ConsoleFn::DrawSettingsPopup();
     }
     
     ImGui::End();
