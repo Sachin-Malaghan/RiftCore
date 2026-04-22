@@ -15,6 +15,7 @@
 #include <vector>
 #include <functional>
 #include <cstdint>
+#include <algorithm>
 
 // Forward declarations for engine types
 namespace RiftCore {
@@ -158,12 +159,6 @@ struct FAssetBrowserState {
           bShowLeftPanel(true), bShowFilters(true), LeftPanelWidth(200.0f) {
         SearchBuffer[0] = '\0';
         CurrentPath = "/";
-    }
-};
-
-// Closing brace removed - was duplicate
-// FAssetFilter closing handled above
-        }
     }
 };
 
