@@ -29,6 +29,12 @@
 #include <algorithm>
 
 namespace RiftCore {
+    ImGuiContext* HUD::GetImGuiContext() const {
+        return ImGui::GetCurrentContext();
+    }
+}
+
+namespace RiftCore {
 
 //=============================================================================
 // CONSTRUCTOR / DESTRUCTOR
