@@ -23,6 +23,10 @@
 
 namespace RiftCore::UI {
 
+// Import CommandBuffer from parent namespace
+using RiftCore::CommandBuffer;
+using RiftCore::EditorCommandType;
+
 //=============================================================================
 // ENUMERATIONS
 //=============================================================================
