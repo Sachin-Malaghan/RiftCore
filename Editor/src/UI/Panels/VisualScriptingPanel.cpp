@@ -1,42 +1,46 @@
 /**
- * @file HierarchyPanel.cpp
- * @brief Production-grade Scene Hierarchy Panel for RiftCore Engine
+ * @file VisualScriptingPanel.cpp
+ * @brief Production-grade Visual Scripting/Blueprint Panel for RiftCore Engine
  * 
- * This panel provides a tree-view of all entities/nodes in the current scene,
- * similar to Unreal Engine's World Outliner. Supports drag-drop reparenting,
- * multi-selection, search filtering, and context menu operations.
+ * This panel provides a node-based visual programming interface similar to
+ * Unreal Engine's Blueprints. Supports creating, editing, and debugging
+ * visual scripts with drag-drop connections and live preview.
  * 
  * @author RiftCore Team
  * @version 2.0.0
  * @date 2026-04-21
  * 
- * @note Architecture inspired by Unreal Engine's SSceneOutliner
+ * @note Architecture inspired by Unreal Engine's Blueprint Editor
+ * @note Uses imgui-node-editor for node graph rendering
  * 
  * ============================================================================
  * EXTERNAL DEPENDENCIES (TODO: Implement these interfaces)
  * ============================================================================
- * - ISceneSystem: Scene graph interface for querying/manipulating nodes
- * - ISceneNode: Individual scene node interface
- * - CommandBuffer: Command pattern for undo/redo support
- * - EventDispatcher: For selection change notifications
- * - EditorPreferences: For saving panel state
+ * - imgui-node-editor (ax::NodeEditor): Node graph rendering library
+ * - IVisualScriptVM: Script execution virtual machine
+ * - INodeRegistry: Registry of available node types
+ * - IScriptAsset: Visual script asset serialization
+ * - IDebugger: Script debugging interface
  * ============================================================================
  */
 
-#include <UI/Panels/HierarchyPanel.h>
+#include <UI/Panels/VisualScriptingPanel.h>
+#include <UI/Styling/ImGuiTheme.h>
 #include <imgui.h>
 #include <algorithm>
-#include <unordered_set>
 #include <unordered_map>
+#include <vector>
+#include <string>
 #include <functional>
 #include <cstring>
-#include <string>
 
-// TODO: Include your engine's scene system headers
-// #include <Scene/SceneSystem.h>
-// #include <Scene/SceneNode.h>
-// #include <Editor/CommandBuffer.h>
-// #include <Core/EventDispatcher.h>
+// Namespace alias for node editor
+namespace ed = ax::NodeEditor;
+
+// TODO: Include your engine's scripting system headers
+// #include <Scripting/VisualScriptVM.h>
+// #include <Scripting/NodeRegistry.h>
+// #include <Assets/ScriptAsset.h>
 
 namespace RiftCore::UI {
 
@@ -44,149 +48,284 @@ namespace RiftCore::UI {
 // CONFIGURATION CONSTANTS
 //=============================================================================
 
-namespace HierarchyConfig {
-    /** Maximum search buffer length */
-    constexpr size_t MAX_SEARCH_LENGTH = 128;
+namespace VisualScriptConfig {
+    /** Default node width */
+    constexpr float DEFAULT_NODE_WIDTH = 200.0f;
     
-    /** Maximum depth for hierarchy display */
-    constexpr int MAX_HIERARCHY_DEPTH = 64;
+    /** Pin radius for connection points */
+    constexpr float PIN_RADIUS = 6.0f;
     
-    /** Indent width per hierarchy level */
-    constexpr float INDENT_WIDTH = 20.0f;
+    /** Connection line thickness */
+    constexpr float LINK_THICKNESS = 3.0f;
     
-    /** Row height for hierarchy items */
-    constexpr float ROW_HEIGHT = 22.0f;
+    /** Grid snap size */
+    constexpr float GRID_SNAP = 16.0f;
     
-    /** Double-click time for rename mode */
-    constexpr float DOUBLE_CLICK_TIME_MS = 300.0f;
+    /** Maximum undo history size */
+    constexpr size_t MAX_UNDO_HISTORY = 100;
+    
+    /** Auto-save interval in seconds */
+    constexpr float AUTO_SAVE_INTERVAL = 60.0f;
+    
+    /** Node search results limit */
+    constexpr int MAX_SEARCH_RESULTS = 20;
 }
 
 //=============================================================================
 // STATIC STATE (uses types from header)
 //=============================================================================
 
-static FHierarchyState s_State;
-static std::unordered_map<uint64_t, FHierarchyNode> s_NodeCache;
-static std::vector<uint64_t> s_RootNodeIDs;
-static std::vector<uint64_t> s_FlattenedVisibleNodes;  // For keyboard navigation
+static FVisualScriptState s_State;
+static FScriptGraph s_CurrentGraph;
+static std::vector<FNodeTemplate> s_NodeTemplates;
+static bool s_bInitialized = false;
 
 //=============================================================================
 // FORWARD DECLARATIONS
 //=============================================================================
 
 static void DrawToolbar();
-static void DrawHierarchyTree(ISceneSystem* scene, CommandBuffer& cb);
-static void DrawNodeRow(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb);
-static void DrawNodeContextMenu(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb);
-static void DrawCreateMenu(ISceneSystem* scene, CommandBuffer& cb, uint64_t parentID = 0);
-static void DrawTypeFilterDropdown();
+static void DrawNodePalette();
+static void DrawNodeGraph();
+static void DrawDetailsPanel();
+static void DrawMinimap();
+static void DrawDebugPanel();
+static void DrawNodeSearchPopup();
 
-static void RefreshNodeCache(ISceneSystem* scene);
-static void ApplyFilters();
-static void SortNodes();
-static void FlattenVisibleNodes();
-static bool NodePassesFilter(const FHierarchyNode& node);
-static void PropagateFilterToParents(uint64_t nodeID);
+static void DrawNode(FNode& node);
+static void DrawPin(const FPin& pin, bool isInput);
+static void DrawLink(const FLink& link);
+static void DrawNewLinkPreview();
 
-static void HandleSelection(uint64_t nodeID, bool isCtrlHeld, bool isShiftHeld);
-static void HandleDragDrop(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb);
-static void HandleKeyboardNavigation(ISceneSystem* scene, CommandBuffer& cb);
-static void HandleRename(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb);
-
-static void SelectAll();
-static void DeselectAll();
-static void DeleteSelectedNodes(ISceneSystem* scene, CommandBuffer& cb);
-static void DuplicateSelectedNodes(ISceneSystem* scene, CommandBuffer& cb);
+static void InitializeNodeTemplates();
+static FNode CreateNodeFromTemplate(const FNodeTemplate& tmpl, const ImVec2& position);
+static void DeleteSelectedNodes();
+static void DuplicateSelectedNodes();
 static void CopySelectedNodes();
-static void PasteNodes(ISceneSystem* scene, CommandBuffer& cb, uint64_t parentID = 0);
-static void FocusNodeInViewport(uint64_t nodeID);
+static void PasteNodes();
 
-static const char* GetNodeTypeIcon(const std::string& typeName);
-static ImVec4 GetNodeTypeColor(const std::string& typeName);
+static bool CanCreateLink(uint64_t startPinID, uint64_t endPinID);
+static void CreateLink(uint64_t startPinID, uint64_t endPinID);
+static void DeleteLink(uint64_t linkID);
+
+static void HandleKeyboardShortcuts();
+static void HandleContextMenu();
+static void UpdateDebugState();
+static void SaveScript();
+
+static ImVec4 GetPinColor(EPinType type);
+static const char* GetPinTypeName(EPinType type);
+static const char* GetCategoryName(ENodeCategory category);
+static const char* GetCategoryIcon(ENodeCategory category);
 
 //=============================================================================
 // PUBLIC API IMPLEMENTATION
 //=============================================================================
 
 /**
- * @brief Main render function for the Hierarchy Panel
+ * @brief Initializes the Visual Scripting Panel
  * 
- * Called every frame by the UI system. Renders the scene hierarchy tree
- * and handles all user interaction.
+ * Must be called once before using the panel. Sets up the node editor
+ * context and loads available node templates.
+ */
+void VisualScriptingPanel::Initialize() {
+    if (s_bInitialized) return;
+    
+    // Create node editor context
+    ed::Config config;
+    config.SettingsFile = "VisualScripting.json";
+    
+    // Configure node editor style
+    // TODO: Apply custom styling to match engine theme
+    
+    m_EditorContext = ed::CreateEditor(&config);
+    
+    // Initialize node templates
+    InitializeNodeTemplates();
+    
+    s_bInitialized = true;
+    
+    // LOG_INFO("VisualScriptingPanel", "Initialized with %zu node templates", s_NodeTemplates.size());
+}
+
+/**
+ * @brief Shuts down the Visual Scripting Panel
  * 
- * @param scene Pointer to the current scene system (can be null)
- * @param cb Command buffer for undo/redo operations
+ * Cleans up the node editor context. Call during editor shutdown.
+ */
+void VisualScriptingPanel::Shutdown() {
+    if (!s_bInitialized) return;
+    
+    if (m_EditorContext) {
+        ed::DestroyEditor(m_EditorContext);
+        m_EditorContext = nullptr;
+    }
+    
+    s_NodeTemplates.clear();
+    s_CurrentGraph = FScriptGraph();
+    
+    s_bInitialized = false;
+    
+    // LOG_INFO("VisualScriptingPanel", "Shutdown complete");
+}
+
+/**
+ * @brief Loads a visual script for editing
+ * 
+ * @param assetID The asset ID of the script to load
+ * 
+ * TODO: Implement actual asset loading
+ */
+void VisualScriptingPanel::LoadScript(uint64_t assetID) {
+    // TODO: Load script from asset system
+    // IScriptAsset* asset = AssetSystem::Load<IScriptAsset>(assetID);
+    // if (asset) {
+    //     s_CurrentGraph = asset->GetGraph();
+    // }
+    
+    s_CurrentGraph = FScriptGraph();
+    s_CurrentGraph.AssetID = assetID;
+    s_CurrentGraph.Name = "NewScript";
+    
+    // Create default event nodes for testing
+    // This would normally come from the loaded asset
+    
+    // LOG_INFO("VisualScriptingPanel", "Loaded script: %s", s_CurrentGraph.Name.c_str());
+}
+
+/**
+ * @brief Internal static save helper (called by free DrawToolbar)
+ */
+static void SaveScript() {
+    s_CurrentGraph.bIsModified = false;
+    s_State.TimeSinceLastSave = 0.0f;
+}
+
+/**
+ * @brief Saves the current visual script
+ * 
+ * TODO: Implement actual asset saving
+ */
+void VisualScriptingPanel::SaveScript() {
+    // TODO: Save script to asset system
+    // IScriptAsset* asset = AssetSystem::Get<IScriptAsset>(s_CurrentGraph.AssetID);
+    // if (asset) {
+    //     asset->SetGraph(s_CurrentGraph);
+    //     asset->Save();
+    // }
+    
+    s_CurrentGraph.bIsModified = false;
+    s_State.TimeSinceLastSave = 0.0f;
+    
+    // LOG_INFO("VisualScriptingPanel", "Saved script: %s", s_CurrentGraph.Name.c_str());
+}
+
+/**
+ * @brief Main render function for the Visual Scripting Panel
+ * 
+ * Called every frame by the UI system.
  * 
  * Layout:
- * ┌─────────────────────────────────────────────────────────────┐
- * │ [Search...                    ] [+] [Filter] [Sort]        │
- * ├─────────────────────────────────────────────────────────────┤
- * │ ▼ Root                                                      │
- * │   ▼ Player                                            👁 🔒 │
- * │     ├ Camera                                          👁 🔒 │
- * │     └ Mesh                                            👁 🔒 │
- * │   ▶ Enemies (collapsed)                               👁 🔒 │
- * │   ├ Light_Sun                                         👁 🔒 │
- * │   └ Light_Fill                                        👁 🔒 │
- * ├─────────────────────────────────────────────────────────────┤
- * │ 5 objects selected                                          │
- * └─────────────────────────────────────────────────────────────┘
+ * ┌───────────────────────────────────────────────────────────────────────┐
+ * │ [Compile] [Save] [Play] [Pause] [Step] │ Search...  │ [Minimap] [...]│
+ * ├──────────────┬────────────────────────────────────────┬───────────────┤
+ * │              │                                        │               │
+ * │  Node        │                                        │   Details     │
+ * │  Palette     │         Node Graph Canvas              │   Panel       │
+ * │  (toggle)    │                                        │   (toggle)    │
+ * │              │                                        │               │
+ * │              │                                        ├───────────────┤
+ * │              │                                        │   Minimap     │
+ * │              │                                        │   (toggle)    │
+ * └──────────────┴────────────────────────────────────────┴───────────────┘
  */
-void HierarchyPanel::OnUIRender(ISceneSystem* scene, CommandBuffer& cb) {
+void VisualScriptingPanel::OnUIRender() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    bool windowOpen = ImGui::Begin("Scene Hierarchy", nullptr, ImGuiWindowFlags_MenuBar);
+    bool windowOpen = ImGui::Begin("Visual Scripting", nullptr, ImGuiWindowFlags_MenuBar);
     ImGui::PopStyleVar();
     if (!windowOpen) {
         ImGui::End();
         return;
     }
     
+    // Validation check
+    if (!m_EditorContext) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+        ImGui::TextWrapped("Node Editor Context not initialized! Call Initialize() first.");
+        ImGui::PopStyleColor();
+        ImGui::End();
+        return;
+    }
+    
     // Menu bar
     if (ImGui::BeginMenuBar()) {
-        if (ImGui::BeginMenu("Edit")) {
-            if (ImGui::MenuItem("Select All", "Ctrl+A")) SelectAll();
-            if (ImGui::MenuItem("Deselect All", "Escape")) DeselectAll();
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("New Script", "Ctrl+N")) {
+                s_CurrentGraph = FScriptGraph();
+            }
+            if (ImGui::MenuItem("Open...", "Ctrl+O")) {
+                // TODO: Open file dialog
+            }
+            if (ImGui::MenuItem("Save", "Ctrl+S", false, s_CurrentGraph.bIsModified)) {
+                SaveScript();
+            }
+            if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+                // TODO: Save as dialog
+            }
             ImGui::Separator();
-            if (ImGui::MenuItem("Delete", "Delete", false, !s_State.SelectedNodeIDs.empty())) {
-                DeleteSelectedNodes(scene, cb);
-            }
-            if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, !s_State.SelectedNodeIDs.empty())) {
-                DuplicateSelectedNodes(scene, cb);
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Copy", "Ctrl+C", false, !s_State.SelectedNodeIDs.empty())) {
-                CopySelectedNodes();
-            }
-            if (ImGui::MenuItem("Paste", "Ctrl+V")) {
-                PasteNodes(scene, cb);
-            }
+            if (ImGui::MenuItem("Import...")) { /* TODO */ }
+            if (ImGui::MenuItem("Export...")) { /* TODO */ }
             ImGui::EndMenu();
         }
         
-        if (ImGui::BeginMenu("Create")) {
-            DrawCreateMenu(scene, cb);
+        if (ImGui::BeginMenu("Edit")) {
+            if (ImGui::MenuItem("Undo", "Ctrl+Z")) { /* TODO */ }
+            if (ImGui::MenuItem("Redo", "Ctrl+Y")) { /* TODO */ }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Cut", "Ctrl+X")) { CopySelectedNodes(); DeleteSelectedNodes(); }
+            if (ImGui::MenuItem("Copy", "Ctrl+C")) { CopySelectedNodes(); }
+            if (ImGui::MenuItem("Paste", "Ctrl+V")) { PasteNodes(); }
+            if (ImGui::MenuItem("Duplicate", "Ctrl+D")) { DuplicateSelectedNodes(); }
+            if (ImGui::MenuItem("Delete", "Delete")) { DeleteSelectedNodes(); }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Select All", "Ctrl+A")) { /* TODO */ }
+            if (ImGui::MenuItem("Deselect All", "Escape")) { s_State.SelectedNodeIDs.clear(); }
             ImGui::EndMenu();
         }
         
         if (ImGui::BeginMenu("View")) {
-            ImGui::MenuItem("Show Hidden", nullptr, &s_State.bShowHiddenNodes);
-            ImGui::MenuItem("Show Locked", nullptr, &s_State.bShowLockedNodes);
+            ImGui::MenuItem("Node Palette", nullptr, &s_State.bShowNodePalette);
+            ImGui::MenuItem("Details Panel", nullptr, &s_State.bShowDetails);
+            ImGui::MenuItem("Minimap", nullptr, &s_State.bShowMinimap);
             ImGui::Separator();
-            
-            if (ImGui::BeginMenu("Sort By")) {
-                if (ImGui::MenuItem("Creation Order", nullptr, s_State.SortMode == ENodeSortMode::CreationOrder)) {
-                    s_State.SortMode = ENodeSortMode::CreationOrder;
-                    s_State.bNeedsRefresh = true;
-                }
-                if (ImGui::MenuItem("Alphabetical", nullptr, s_State.SortMode == ENodeSortMode::Alphabetical)) {
-                    s_State.SortMode = ENodeSortMode::Alphabetical;
-                    s_State.bNeedsRefresh = true;
-                }
-                if (ImGui::MenuItem("Type", nullptr, s_State.SortMode == ENodeSortMode::Type)) {
-                    s_State.SortMode = ENodeSortMode::Type;
-                    s_State.bNeedsRefresh = true;
-                }
-                ImGui::EndMenu();
+            ImGui::MenuItem("Show Grid", nullptr, &s_State.bShowGrid);
+            ImGui::MenuItem("Snap to Grid", nullptr, &s_State.bSnapToGrid);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Zoom to Fit", "Home")) {
+                // TODO: ed::NavigateToContent();
+            }
+            if (ImGui::MenuItem("Zoom to Selection", "F")) {
+                // TODO: ed::NavigateToSelection();
+            }
+            ImGui::EndMenu();
+        }
+        
+        if (ImGui::BeginMenu("Debug")) {
+            if (ImGui::MenuItem("Compile", "F7")) {
+                // TODO: Compile script
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Start Debugging", "F5", false, !s_State.bIsDebugging)) {
+                s_State.bIsDebugging = true;
+            }
+            if (ImGui::MenuItem("Stop Debugging", "Shift+F5", false, s_State.bIsDebugging)) {
+                s_State.bIsDebugging = false;
+            }
+            if (ImGui::MenuItem("Pause", nullptr, s_State.bIsPaused, s_State.bIsDebugging)) {
+                s_State.bIsPaused = !s_State.bIsPaused;
+            }
+            if (ImGui::MenuItem("Step", "F10", false, s_State.bIsDebugging && s_State.bIsPaused)) {
+                // TODO: Step execution
             }
             ImGui::EndMenu();
         }
@@ -194,17 +333,20 @@ void HierarchyPanel::OnUIRender(ISceneSystem* scene, CommandBuffer& cb) {
         ImGui::EndMenuBar();
     }
     
-    // Refresh cache if scene changed
-    if (s_State.bNeedsRefresh && scene) {
-        RefreshNodeCache(scene);
-        s_State.bNeedsRefresh = false;
-        s_State.bNeedsRefilter = true;
+    // Handle keyboard shortcuts
+    HandleKeyboardShortcuts();
+    
+    // Update auto-save timer
+    if (s_State.bAutoSaveEnabled && s_CurrentGraph.bIsModified) {
+        s_State.TimeSinceLastSave += ImGui::GetIO().DeltaTime;
+        if (s_State.TimeSinceLastSave >= VisualScriptConfig::AUTO_SAVE_INTERVAL) {
+            SaveScript();
+        }
     }
     
-    // Apply filters
-    if (s_State.bNeedsRefilter) {
-        ApplyFilters();
-        s_State.bNeedsRefilter = false;
+    // Update debug state
+    if (s_State.bIsDebugging) {
+        UpdateDebugState();
     }
     
     // Toolbar
@@ -214,102 +356,49 @@ void HierarchyPanel::OnUIRender(ISceneSystem* scene, CommandBuffer& cb) {
     
     ImGui::Separator();
     
-    // Main hierarchy tree area
-    float statusBarHeight = 24.0f;
-    float treeHeight = ImGui::GetContentRegionAvail().y - statusBarHeight;
+    // Main content area with panels
+    float contentHeight = ImGui::GetContentRegionAvail().y;
     
-    ImGui::BeginChild("HierarchyTree", ImVec2(0, treeHeight), true);
-    
-    // Handle keyboard navigation
-    HandleKeyboardNavigation(scene, cb);
-    
-    // Draw the tree
-    if (scene) {
-        DrawHierarchyTree(scene, cb);
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        ImGui::TextWrapped("No scene loaded. Create or open a scene to view the hierarchy.");
-        ImGui::PopStyleColor();
+    // Left panel - Node Palette
+    if (s_State.bShowNodePalette) {
+        ImGui::BeginChild("NodePalette", ImVec2(200, contentHeight), true);
+        DrawNodePalette();
+        ImGui::EndChild();
+        
+        ImGui::SameLine();
     }
     
-    // Context menu for empty area (create new root object)
-    if (ImGui::BeginPopupContextWindow("EmptyAreaContext", 
-        ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
-        DrawCreateMenu(scene, cb, 0);
-        ImGui::EndPopup();
+    // Center - Node Graph
+    float graphWidth = ImGui::GetContentRegionAvail().x;
+    if (s_State.bShowDetails) {
+        graphWidth -= s_State.DetailsPanelWidth + 4;
     }
     
-    // Handle drop into empty area (reparent to root)
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_NODE")) {
-            uint64_t droppedID = *(uint64_t*)payload->Data;
-            // TODO: Reparent to root
-            // scene->ReparentNode(droppedID, 0);
-            // cb.Push({EditorCommandType::ReparentNode, droppedID, 0});
-            (void)droppedID;
-            s_State.bNeedsRefresh = true;
-        }
-        ImGui::EndDragDropTarget();
-    }
-    
+    ImGui::BeginChild("GraphCanvas", ImVec2(graphWidth, contentHeight), true, ImGuiWindowFlags_NoScrollbar);
+    DrawNodeGraph();
     ImGui::EndChild();
     
-    // Status bar
-    ImGui::Separator();
-    size_t selectedCount = s_State.SelectedNodeIDs.size();
-    if (selectedCount > 0) {
-        ImGui::Text("%zu object(s) selected", selectedCount);
-    } else {
-        ImGui::TextDisabled("%zu objects in scene", s_NodeCache.size());
+    // Right panel - Details
+    if (s_State.bShowDetails) {
+        ImGui::SameLine();
+        
+        ImGui::BeginChild("DetailsPanel", ImVec2(s_State.DetailsPanelWidth, contentHeight), true);
+        DrawDetailsPanel();
+        
+        // Minimap at bottom of details panel
+        if (s_State.bShowMinimap) {
+            DrawMinimap();
+        }
+        
+        ImGui::EndChild();
     }
     
-    // Type filter dropdown
-    if (s_State.bShowTypeFilter) {
-        DrawTypeFilterDropdown();
+    // Node search popup
+    if (s_State.bShowNewNodeMenu) {
+        DrawNodeSearchPopup();
     }
     
     ImGui::End();
-}
-
-/**
- * @brief Gets the ID of the currently selected node
- * 
- * For single selection scenarios. If multiple nodes are selected,
- * returns the first one.
- * 
- * @return Selected node ID, or 0 if nothing selected
- */
-SceneNodeID HierarchyPanel::GetSelectedNode() const {
-    return m_SelectedNode;
-}
-
-/**
- * @brief Sets the selected node programmatically
- * 
- * @param nodeID The node ID to select
- */
-void HierarchyPanel::SetSelectedNode(uint64_t nodeID) {
-    m_SelectedNode = nodeID;
-    
-    DeselectAll();
-    if (nodeID != 0) {
-        s_State.SelectedNodeIDs.insert(nodeID);
-        
-        auto it = s_NodeCache.find(nodeID);
-        if (it != s_NodeCache.end()) {
-            it->second.bIsSelected = true;
-        }
-    }
-    
-    // TODO: Broadcast selection changed event
-    // EventDispatcher::Broadcast<HierarchySelectionChangedEvent>(s_State.SelectedNodeIDs);
-}
-
-/**
- * @brief Forces a refresh of the hierarchy cache
- */
-void HierarchyPanel::Refresh() {
-    s_State.bNeedsRefresh = true;
 }
 
 //=============================================================================
@@ -317,467 +406,850 @@ void HierarchyPanel::Refresh() {
 //=============================================================================
 
 /**
- * @brief Draws the toolbar with search and quick actions
+ * @brief Draws the toolbar with common actions
  */
 static void DrawToolbar() {
-    // Search input
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 120.0f);
-    if (ImGui::InputTextWithHint("##Search", "Search hierarchy...", 
-        s_State.SearchBuffer, sizeof(s_State.SearchBuffer))) {
-        s_State.bNeedsRefilter = true;
+    // Compile button
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.6f, 1.0f));
+    if (ImGui::Button("Compile", ImVec2(70, 0))) {
+        // TODO: Compile script
     }
+    ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Compile script (F7)");
     
     ImGui::SameLine();
     
-    // Add object button
-    if (ImGui::Button("+", ImVec2(25, 0))) {
-        ImGui::OpenPopup("CreateObjectPopup");
-    }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Create new object");
-    
-    // Create object popup
-    if (ImGui::BeginPopup("CreateObjectPopup")) {
-        DrawCreateMenu(nullptr, *(CommandBuffer*)nullptr, 0);
-        ImGui::EndPopup();
-    }
-    
-    ImGui::SameLine();
-    
-    // Filter button
-    if (ImGui::Button("Filter", ImVec2(50, 0))) {
-        s_State.bShowTypeFilter = !s_State.bShowTypeFilter;
-    }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Filter by type");
-}
-
-/**
- * @brief Draws the hierarchy tree recursively
- * 
- * @param scene The scene system
- * @param cb Command buffer for operations
- */
-static void DrawHierarchyTree(ISceneSystem* scene, CommandBuffer& cb) {
-    // Draw root level nodes
-    for (uint64_t rootID : s_RootNodeIDs) {
-        auto it = s_NodeCache.find(rootID);
-        if (it != s_NodeCache.end() && (it->second.bMatchesFilter || it->second.bHasMatchingChild)) {
-            DrawNodeRow(it->second, scene, cb);
-        }
-    }
-}
-
-/**
- * @brief Draws a single node row with all its children
- * 
- * @param node The node to draw
- * @param scene The scene system
- * @param cb Command buffer for operations
- */
-static void DrawNodeRow(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb) {
-    ImGui::PushID(static_cast<int>(node.ID));
-    
-    // Determine if this node should be visible
-    if (!node.bMatchesFilter && !node.bHasMatchingChild) {
-        ImGui::PopID();
-        return;
-    }
-    
-    // Check visibility/lock filters
-    if (!s_State.bShowHiddenNodes && node.Visibility == ENodeVisibility::Hidden) {
-        ImGui::PopID();
-        return;
-    }
-    if (!s_State.bShowLockedNodes && node.bIsLocked) {
-        ImGui::PopID();
-        return;
-    }
-    
-    // Build tree node flags
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | 
-                               ImGuiTreeNodeFlags_SpanAvailWidth |
-                               ImGuiTreeNodeFlags_AllowOverlap;
-    
-    if (node.bIsSelected) {
-        flags |= ImGuiTreeNodeFlags_Selected;
-    }
-    
-    if (node.ChildIDs.empty()) {
-        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    }
-    
-    // Dim color if doesn't match filter but has matching child
-    if (!node.bMatchesFilter && node.bHasMatchingChild) {
+    // Save button
+    bool hasChanges = s_CurrentGraph.bIsModified;
+    if (!hasChanges) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
     }
-    
-    // Type icon
-    ImGui::PushStyleColor(ImGuiCol_Text, GetNodeTypeColor(node.TypeName));
-    ImGui::Text("%s", GetNodeTypeIcon(node.TypeName));
-    ImGui::PopStyleColor();
-    ImGui::SameLine();
-    
-    // Node name or rename input
-    bool isOpen = false;
-    
-    if (node.bIsRenaming && node.ID == s_State.RenamingNodeID) {
-        // Rename mode
-        ImGui::SetNextItemWidth(150.0f);
-        
-        if (ImGui::InputText("##Rename", s_State.RenameBuffer, sizeof(s_State.RenameBuffer),
-            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
-            // Confirm rename
-            HandleRename(node, scene, cb);
-        }
-        
-        if (ImGui::IsItemDeactivated()) {
-            node.bIsRenaming = false;
-            s_State.RenamingNodeID = 0;
-        }
-        
-        // Focus the input on first frame
-        if (ImGui::IsItemVisible() && !ImGui::IsItemActive()) {
-            ImGui::SetKeyboardFocusHere(-1);
-        }
-    } else {
-        // Normal tree node
-        isOpen = ImGui::TreeNodeEx(node.Name.c_str(), flags);
+    if (ImGui::Button("Save", ImVec2(50, 0))) {
+        SaveScript();
+    }
+    if (!hasChanges) {
+        ImGui::PopStyleColor(2);
     }
     
-    // Restore color
-    if (!node.bMatchesFilter && node.bHasMatchingChild) {
+    ImGui::SameLine();
+    ImGui::Spacing();
+    ImGui::SameLine();
+    
+    // Debug controls
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    
+    // Play button
+    ImVec4 playColor = s_State.bIsDebugging 
+        ? ImVec4(0.8f, 0.3f, 0.3f, 1.0f)  // Red when running
+        : ImVec4(0.2f, 0.6f, 0.2f, 1.0f); // Green when stopped
+    
+    ImGui::PushStyleColor(ImGuiCol_Button, playColor);
+    const char* playLabel = s_State.bIsDebugging ? "Stop" : "Play";
+    if (ImGui::Button(playLabel, ImVec2(50, 0))) {
+        s_State.bIsDebugging = !s_State.bIsDebugging;
+        if (!s_State.bIsDebugging) {
+            s_State.bIsPaused = false;
+        }
+    }
+    ImGui::PopStyleColor();
+    
+    ImGui::SameLine();
+    
+    // Pause button (only when debugging)
+    ImGui::BeginDisabled(!s_State.bIsDebugging);
+    ImVec4 pauseColor = s_State.bIsPaused 
+        ? ImVec4(0.8f, 0.6f, 0.2f, 1.0f) 
+        : ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, pauseColor);
+    if (ImGui::Button("||", ImVec2(25, 0))) {
+        s_State.bIsPaused = !s_State.bIsPaused;
+    }
+    ImGui::PopStyleColor();
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Pause execution");
+    
+    ImGui::SameLine();
+    
+    // Step button
+    ImGui::BeginDisabled(!s_State.bIsDebugging || !s_State.bIsPaused);
+    if (ImGui::Button(">|", ImVec2(25, 0))) {
+        // TODO: Step one node
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Step (F10)");
+    
+    ImGui::SameLine();
+    ImGui::Spacing();
+    ImGui::SameLine();
+    
+    // Search bar
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::InputTextWithHint("##Search", "Search nodes... (Tab)", 
+        s_State.SearchBuffer, sizeof(s_State.SearchBuffer))) {
+        // TODO: Filter node search
+    }
+    
+    // Right-aligned info
+    ImGui::SameLine(ImGui::GetWindowWidth() - 200.0f);
+    
+    // Script name
+    if (s_CurrentGraph.bIsModified) {
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "%s*", s_CurrentGraph.Name.c_str());
+    } else {
+        ImGui::Text("%s", s_CurrentGraph.Name.c_str());
+    }
+    
+    ImGui::SameLine();
+    
+    // Node count
+    ImGui::TextDisabled("(%zu nodes)", s_CurrentGraph.Nodes.size());
+}
+
+/**
+ * @brief Draws the node palette panel
+ */
+static void DrawNodePalette() {
+    ImGui::Text("Node Palette");
+    ImGui::Separator();
+    
+    // Search within palette
+    static char paletteSearch[128] = "";
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    ImGui::InputTextWithHint("##PaletteSearch", "Filter...", paletteSearch, sizeof(paletteSearch));
+    
+    ImGui::Spacing();
+    
+    // Categorized nodes
+    ENodeCategory lastCategory = ENodeCategory::Custom;
+    bool categoryOpen = false;
+    
+    for (const auto& tmpl : s_NodeTemplates) {
+        // Filter by search
+        if (paletteSearch[0] != '\0') {
+            std::string searchLower = paletteSearch;
+            std::transform(searchLower.begin(), searchLower.end(), searchLower.begin(), ::tolower);
+            
+            std::string nameLower = tmpl.Name;
+            std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
+            
+            if (nameLower.find(searchLower) == std::string::npos) {
+                continue;
+            }
+        }
+        
+        // Category header
+        if (tmpl.Category != lastCategory) {
+            if (categoryOpen) ImGui::TreePop();
+            
+            lastCategory = tmpl.Category;
+            categoryOpen = ImGui::TreeNodeEx(GetCategoryName(tmpl.Category), 
+                ImGuiTreeNodeFlags_DefaultOpen);
+        }
+        
+        if (categoryOpen) {
+            // Selectable node template
+            if (ImGui::Selectable(tmpl.Name.c_str())) {
+                // Create node at center of view
+                // TODO: Get center position from node editor
+                FNode newNode = CreateNodeFromTemplate(tmpl, ImVec2(0, 0));
+                s_CurrentGraph.Nodes[newNode.ID] = newNode;
+                s_CurrentGraph.bIsModified = true;
+            }
+            
+            // Drag source for dropping onto canvas
+            if (ImGui::BeginDragDropSource()) {
+                ImGui::SetDragDropPayload("NODE_TEMPLATE", &tmpl, sizeof(FNodeTemplate*));
+                ImGui::Text("Create: %s", tmpl.Name.c_str());
+                ImGui::EndDragDropSource();
+            }
+            
+            // Tooltip with description
+            if (ImGui::IsItemHovered() && !tmpl.Description.empty()) {
+                ImGui::SetTooltip("%s", tmpl.Description.c_str());
+            }
+        }
+    }
+    
+    if (categoryOpen) ImGui::TreePop();
+}
+
+/**
+ * @brief Draws the main node graph canvas
+ */
+static void DrawNodeGraph() {
+    ed::SetCurrentEditor(VisualScriptingPanel::m_EditorContext);
+    
+    // Style customization
+    ed::PushStyleColor(ed::StyleColor_Bg, ImColor(25, 25, 28, 255));
+    ed::PushStyleColor(ed::StyleColor_Grid, ImColor(50, 50, 55, 128));
+    ed::PushStyleVar(ed::StyleVar_NodeRounding, 4.0f);
+    ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 1.0f);
+    ed::PushStyleVar(ed::StyleVar_PinRadius, VisualScriptConfig::PIN_RADIUS);
+    ed::PushStyleVar(ed::StyleVar_LinkStrength, 100.0f);
+    
+    ed::Begin("NodeGraph");
+    
+    // Draw all nodes
+    for (auto& [id, node] : s_CurrentGraph.Nodes) {
+        DrawNode(node);
+    }
+    
+    // Draw all links
+    for (auto& [id, link] : s_CurrentGraph.Links) {
+        DrawLink(link);
+    }
+    
+    // Handle link creation
+    if (ed::BeginCreate()) {
+        ed::PinId startPinId, endPinId;
+        if (ed::QueryNewLink(&startPinId, &endPinId)) {
+            if (startPinId && endPinId) {
+                if (CanCreateLink(startPinId.Get(), endPinId.Get())) {
+                    if (ed::AcceptNewItem(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), 2.0f)) {
+                        CreateLink(startPinId.Get(), endPinId.Get());
+                    }
+                } else {
+                    ed::RejectNewItem(ImVec4(0.8f, 0.3f, 0.3f, 1.0f), 2.0f);
+                }
+            }
+        }
+        
+        // Handle new node creation from pin drag
+        ed::PinId pinId;
+        if (ed::QueryNewNode(&pinId)) {
+            if (ed::AcceptNewItem()) {
+                s_State.NewLinkStartPin = pinId.Get();
+                s_State.bShowNewNodeMenu = true;
+                s_State.NewNodePosition = ImGui::GetMousePos();
+            }
+        }
+    }
+    ed::EndCreate();
+    
+    // Handle deletion
+    if (ed::BeginDelete()) {
+        ed::LinkId linkId;
+        while (ed::QueryDeletedLink(&linkId)) {
+            if (ed::AcceptDeletedItem()) {
+                DeleteLink(linkId.Get());
+            }
+        }
+        
+        ed::NodeId nodeId;
+        while (ed::QueryDeletedNode(&nodeId)) {
+            if (ed::AcceptDeletedItem()) {
+                s_CurrentGraph.Nodes.erase(nodeId.Get());
+                s_CurrentGraph.bIsModified = true;
+            }
+        }
+    }
+    ed::EndDelete();
+    
+    // Context menu
+    HandleContextMenu();
+    
+    ed::End();
+    
+    ed::PopStyleVar(4);
+    ed::PopStyleColor(2);
+    
+    ed::SetCurrentEditor(nullptr);
+}
+
+/**
+ * @brief Draws a single node
+ * 
+ * @param node The node to draw
+ */
+static void DrawNode(FNode& node) {
+    // Determine node color based on category and state
+    ImVec4 headerColor;
+    switch (node.Category) {
+        case ENodeCategory::Event:
+            headerColor = ImVec4(0.7f, 0.2f, 0.2f, 1.0f);  // Red
+            break;
+        case ENodeCategory::Flow:
+            headerColor = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  // Gray
+            break;
+        case ENodeCategory::Math:
+            headerColor = ImVec4(0.2f, 0.5f, 0.2f, 1.0f);  // Green
+            break;
+        case ENodeCategory::Variable:
+            headerColor = ImVec4(0.2f, 0.2f, 0.7f, 1.0f);  // Blue
+            break;
+        case ENodeCategory::Function:
+        default:
+            headerColor = ImVec4(0.3f, 0.3f, 0.5f, 1.0f);  // Purple-ish
+            break;
+    }
+    
+    // Highlight if debugging
+    if (s_State.bIsDebugging && node.ID == s_State.CurrentExecutingNode) {
+        headerColor = ImVec4(0.8f, 0.6f, 0.1f, 1.0f);  // Orange when executing
+    }
+    
+    // Error highlight
+    if (node.bHasError) {
+        headerColor = ImVec4(0.9f, 0.1f, 0.1f, 1.0f);  // Bright red for errors
+    }
+    
+    ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(40, 40, 45, 230));
+    ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(headerColor));
+    
+    ed::BeginNode(node.ID);
+    
+    // Node header
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    
+    // Category icon
+    ImGui::TextColored(ImVec4(headerColor.x, headerColor.y, headerColor.z, 1.0f), 
+        "%s", GetCategoryIcon(node.Category));
+    ImGui::SameLine();
+    
+    // Node title
+    ImGui::Text("%s", node.Name.c_str());
+    ImGui::PopStyleColor();
+    
+    // Error indicator
+    if (node.bHasError) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), " [!]");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", node.ErrorMessage.c_str());
+        }
+    }
+    
+    ImGui::Spacing();
+    
+    // Draw pins
+    ImGui::BeginGroup();
+    for (const auto& pin : node.InputPins) {
+        DrawPin(pin, true);
+    }
+    ImGui::EndGroup();
+    
+    ImGui::SameLine(VisualScriptConfig::DEFAULT_NODE_WIDTH - 80);
+    
+    ImGui::BeginGroup();
+    for (const auto& pin : node.OutputPins) {
+        DrawPin(pin, false);
+    }
+    ImGui::EndGroup();
+    
+    // Comment (if any)
+    if (!node.Comment.empty() && !node.bIsCollapsed) {
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+        ImGui::TextWrapped("%s", node.Comment.c_str());
         ImGui::PopStyleColor();
     }
     
-    // Click handling
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen()) {
-        HandleSelection(node.ID, ImGui::GetIO().KeyCtrl, ImGui::GetIO().KeyShift);
-        
-        // Double-click to start rename
-        float currentTime = static_cast<float>(ImGui::GetTime() * 1000.0f);
-        if (node.ID == s_State.LastClickedNodeID && 
-            currentTime - s_State.LastClickTime < HierarchyConfig::DOUBLE_CLICK_TIME_MS) {
-            node.bIsRenaming = true;
-            s_State.RenamingNodeID = node.ID;
-            strncpy(s_State.RenameBuffer, node.Name.c_str(), sizeof(s_State.RenameBuffer) - 1);
-        }
-        s_State.LastClickedNodeID = node.ID;
-        s_State.LastClickTime = currentTime;
+    ed::EndNode();
+    
+    ed::PopStyleColor(2);
+}
+
+/**
+ * @brief Draws a single pin
+ * 
+ * @param pin The pin to draw
+ * @param isInput Whether this is an input pin
+ */
+static void DrawPin(const FPin& pin, bool isInput) {
+    ImVec4 pinColor = GetPinColor(pin.Type);
+    
+    ed::PushStyleColor(ed::StyleColor_PinRect, ImColor(pinColor));
+    ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor(pinColor.x * 0.8f, pinColor.y * 0.8f, pinColor.z * 0.8f, 1.0f));
+    
+    if (isInput) {
+        ed::BeginPin(pin.ID, ed::PinKind::Input);
+    } else {
+        ed::BeginPin(pin.ID, ed::PinKind::Output);
     }
     
-    // Right-click context menu
-    if (ImGui::BeginPopupContextItem()) {
-        DrawNodeContextMenu(node, scene, cb);
-        ImGui::EndPopup();
+    // Pin icon based on type
+    if (pin.Type == EPinType::Flow) {
+        // Triangle for flow pins
+        ImGui::Text(isInput ? ">" : ">");
+    } else {
+        // Circle for data pins
+        ImGui::Text("O");
     }
-    
-    // Drag source
-    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-        ImGui::SetDragDropPayload("HIERARCHY_NODE", &node.ID, sizeof(uint64_t));
-        ImGui::Text("Move: %s", node.Name.c_str());
-        if (s_State.SelectedNodeIDs.size() > 1) {
-            ImGui::TextDisabled("(+%zu more)", s_State.SelectedNodeIDs.size() - 1);
-        }
-        ImGui::EndDragDropSource();
-    }
-    
-    // Drag target
-    HandleDragDrop(node, scene, cb);
-    
-    // Right side buttons (visibility, lock)
-    float rightButtonsX = ImGui::GetWindowWidth() - 50.0f;
-    ImGui::SameLine(rightButtonsX);
-    
-    // Visibility toggle
-    const char* visIcon = (node.Visibility == ENodeVisibility::Visible) ? "O" : "-";
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_Text, 
-        node.Visibility == ENodeVisibility::Visible ? ImVec4(1, 1, 1, 1) : ImVec4(0.5f, 0.5f, 0.5f, 1));
-    if (ImGui::SmallButton(visIcon)) {
-        node.Visibility = (node.Visibility == ENodeVisibility::Visible) 
-            ? ENodeVisibility::Hidden 
-            : ENodeVisibility::Visible;
-        // TODO: Apply to scene
-        // scene->SetNodeVisibility(node.ID, node.Visibility);
-        // cb.Push({EditorCommandType::SetVisibility, node.ID, node.Visibility});
-    }
-    ImGui::PopStyleColor(2);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle visibility");
     
     ImGui::SameLine();
     
-    // Lock toggle
-    const char* lockIcon = node.bIsLocked ? "L" : "U";
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_Text, 
-        node.bIsLocked ? ImVec4(1.0f, 0.5f, 0.0f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1));
-    if (ImGui::SmallButton(lockIcon)) {
-        node.bIsLocked = !node.bIsLocked;
-        // TODO: Apply to scene
-        // scene->SetNodeLocked(node.ID, node.bIsLocked);
-    }
-    ImGui::PopStyleColor(2);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(node.bIsLocked ? "Unlock" : "Lock");
+    // Pin label
+    ImGui::Text("%s", pin.Name.c_str());
     
-    // Draw children if expanded
-    if (isOpen && !node.ChildIDs.empty()) {
-        for (uint64_t childID : node.ChildIDs) {
-            auto childIt = s_NodeCache.find(childID);
-            if (childIt != s_NodeCache.end()) {
-                DrawNodeRow(childIt->second, scene, cb);
+    ed::EndPin();
+    
+    ed::PopStyleColor(2);
+    
+    // Tooltip
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s (%s)", pin.Name.c_str(), GetPinTypeName(pin.Type));
+    }
+}
+
+/**
+ * @brief Draws a link between two pins
+ * 
+ * @param link The link to draw
+ */
+static void DrawLink(const FLink& link) {
+    ed::Link(link.ID, link.StartPinID, link.EndPinID, 
+        ImColor(link.Color), link.Thickness);
+}
+
+/**
+ * @brief Draws the details panel for selected nodes
+ */
+static void DrawDetailsPanel() {
+    ImGui::Text("Details");
+    ImGui::Separator();
+    
+    if (s_State.SelectedNodeIDs.empty()) {
+        ImGui::TextDisabled("Select a node to view details");
+        return;
+    }
+    
+    // Show details for first selected node
+    uint64_t nodeID = s_State.SelectedNodeIDs[0];
+    auto it = s_CurrentGraph.Nodes.find(nodeID);
+    if (it == s_CurrentGraph.Nodes.end()) return;
+    
+    FNode& node = it->second;
+    
+    // Node info
+    ImGui::Text("Node: %s", node.Name.c_str());
+    ImGui::TextDisabled("ID: %llu", (unsigned long long)node.ID);
+    ImGui::TextDisabled("Type: %s", node.ClassName.c_str());
+    
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    // Comment editor
+    ImGui::Text("Comment:");
+    static char commentBuf[512];
+    strncpy(commentBuf, node.Comment.c_str(), sizeof(commentBuf) - 1);
+    if (ImGui::InputTextMultiline("##Comment", commentBuf, sizeof(commentBuf), ImVec2(-1, 60))) {
+        node.Comment = commentBuf;
+        s_CurrentGraph.bIsModified = true;
+    }
+    
+    ImGui::Spacing();
+    
+    // Input pin values
+    if (!node.InputPins.empty()) {
+        ImGui::Text("Inputs:");
+        ImGui::Indent();
+        for (auto& pin : node.InputPins) {
+            if (pin.Type != EPinType::Flow && !pin.bIsConnected) {
+                ImGui::Text("%s:", pin.Name.c_str());
+                ImGui::SameLine();
+                
+                // Simple value editor based on type
+                // TODO: Proper type-specific editors
+                static char valueBuf[256];
+                strncpy(valueBuf, pin.DefaultValue.c_str(), sizeof(valueBuf) - 1);
+                ImGui::SetNextItemWidth(100);
+                if (ImGui::InputText(("##" + pin.Name).c_str(), valueBuf, sizeof(valueBuf))) {
+                    pin.DefaultValue = valueBuf;
+                    s_CurrentGraph.bIsModified = true;
+                }
             }
         }
-        ImGui::TreePop();
+        ImGui::Unindent();
     }
     
-    ImGui::PopID();
-}
-
-/**
- * @brief Draws the context menu for a node
- * 
- * @param node The node being right-clicked
- * @param scene The scene system
- * @param cb Command buffer for operations
- */
-static void DrawNodeContextMenu(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb) {
-    if (ImGui::MenuItem("Rename", "F2")) {
-        node.bIsRenaming = true;
-        s_State.RenamingNodeID = node.ID;
-        strncpy(s_State.RenameBuffer, node.Name.c_str(), sizeof(s_State.RenameBuffer) - 1);
-    }
+    ImGui::Spacing();
     
-    if (ImGui::MenuItem("Focus", "F")) {
-        FocusNodeInViewport(node.ID);
-    }
-    
-    ImGui::Separator();
-    
-    if (ImGui::MenuItem("Duplicate", "Ctrl+D")) {
-        DuplicateSelectedNodes(scene, cb);
-    }
-    
-    if (ImGui::MenuItem("Delete", "Delete")) {
-        DeleteSelectedNodes(scene, cb);
-    }
-    
-    ImGui::Separator();
-    
-    if (ImGui::MenuItem("Copy", "Ctrl+C")) {
-        CopySelectedNodes();
-    }
-    
-    if (ImGui::MenuItem("Paste", "Ctrl+V")) {
-        PasteNodes(scene, cb, node.ID);
-    }
-    
-    if (ImGui::MenuItem("Cut", "Ctrl+X")) {
-        CopySelectedNodes();
-        DeleteSelectedNodes(scene, cb);
-    }
-    
-    ImGui::Separator();
-    
-    if (ImGui::BeginMenu("Create Child")) {
-        DrawCreateMenu(scene, cb, node.ID);
-        ImGui::EndMenu();
-    }
-    
-    ImGui::Separator();
-    
-    bool isVisible = node.Visibility == ENodeVisibility::Visible;
-    if (ImGui::MenuItem(isVisible ? "Hide" : "Show", "H")) {
-        node.Visibility = isVisible ? ENodeVisibility::Hidden : ENodeVisibility::Visible;
-        // TODO: Apply to scene
-    }
-    
-    if (ImGui::MenuItem(node.bIsLocked ? "Unlock" : "Lock")) {
-        node.bIsLocked = !node.bIsLocked;
-        // TODO: Apply to scene
-    }
-}
-
-/**
- * @brief Draws the create object menu
- * 
- * @param scene The scene system
- * @param cb Command buffer
- * @param parentID Parent node ID (0 for root)
- */
-static void DrawCreateMenu(ISceneSystem* scene, CommandBuffer& cb, uint64_t parentID) {
-    (void)scene; (void)cb; (void)parentID;
-    
-    if (ImGui::MenuItem("Empty Object")) {
-        // TODO: scene->CreateNode("Empty", parentID);
-        // cb.Push({EditorCommandType::SpawnEntity, "Empty", parentID});
-        s_State.bNeedsRefresh = true;
-    }
-    
-    ImGui::Separator();
-    
-    if (ImGui::BeginMenu("3D Object")) {
-        if (ImGui::MenuItem("Cube")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Sphere")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Plane")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Cylinder")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Capsule")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        ImGui::EndMenu();
-    }
-    
-    if (ImGui::BeginMenu("Light")) {
-        if (ImGui::MenuItem("Directional Light")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Point Light")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Spot Light")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Area Light")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        ImGui::EndMenu();
-    }
-    
-    if (ImGui::BeginMenu("Audio")) {
-        if (ImGui::MenuItem("Audio Source")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Audio Listener")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        ImGui::EndMenu();
-    }
-    
-    if (ImGui::BeginMenu("Effects")) {
-        if (ImGui::MenuItem("Particle System")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Decal")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        ImGui::EndMenu();
-    }
-    
-    if (ImGui::MenuItem("Camera")) { /* TODO */ s_State.bNeedsRefresh = true; }
-    
-    ImGui::Separator();
-    
-    if (ImGui::BeginMenu("UI")) {
-        if (ImGui::MenuItem("Canvas")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Text")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Image")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        if (ImGui::MenuItem("Button")) { /* TODO */ s_State.bNeedsRefresh = true; }
-        ImGui::EndMenu();
-    }
-}
-
-/**
- * @brief Draws the type filter dropdown
- */
-static void DrawTypeFilterDropdown() {
-    ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
-    
-    if (ImGui::Begin("TypeFilter", &s_State.bShowTypeFilter,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    // Debug info
+    if (s_State.bIsDebugging) {
+        ImGui::Separator();
+        ImGui::Text("Debug:");
         
-        ImGui::Text("Filter by Type:");
+        const char* stateNames[] = { "Inactive", "Pending", "Executing", "Completed", "Error" };
+        ImGui::TextColored(
+            node.State == ENodeState::Error ? ImVec4(1, 0, 0, 1) : ImVec4(0.7f, 0.7f, 0.7f, 1),
+            "State: %s", stateNames[static_cast<int>(node.State)]
+        );
+    }
+}
+
+/**
+ * @brief Draws the minimap
+ */
+static void DrawMinimap() {
+    ImGui::Separator();
+    ImGui::Text("Minimap");
+    
+    ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, 100);
+    
+    // TODO: Draw actual minimap using ed::GetScreenSize(), node positions, etc.
+    ImGui::Button("##Minimap", size);
+    
+    // Click to navigate
+    if (ImGui::IsItemClicked()) {
+        // TODO: Navigate to clicked position
+    }
+}
+
+/**
+ * @brief Draws the node search popup
+ */
+static void DrawNodeSearchPopup() {
+    ImGui::SetNextWindowPos(s_State.NewNodePosition);
+    ImGui::SetNextWindowSize(ImVec2(250, 300));
+    
+    if (ImGui::Begin("Create Node", &s_State.bShowNewNodeMenu, 
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+        
+        // Search input
+        if (ImGui::IsWindowAppearing()) {
+            ImGui::SetKeyboardFocusHere();
+        }
+        
+        static char searchBuf[128] = "";
+        if (ImGui::InputText("##NodeSearch", searchBuf, sizeof(searchBuf))) {
+            // Filter templates
+            s_State.SearchResults.clear();
+            s_State.SelectedSearchIndex = -1;
+            
+            std::string searchLower = searchBuf;
+            std::transform(searchLower.begin(), searchLower.end(), searchLower.begin(), ::tolower);
+            
+            for (const auto& tmpl : s_NodeTemplates) {
+                std::string nameLower = tmpl.Name;
+                std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
+                
+                if (nameLower.find(searchLower) != std::string::npos ||
+                    tmpl.Keywords.find(searchLower) != std::string::npos) {
+                    s_State.SearchResults.push_back(tmpl);
+                    if (s_State.SearchResults.size() >= VisualScriptConfig::MAX_SEARCH_RESULTS) {
+                        break;
+                    }
+                }
+            }
+        }
+        
         ImGui::Separator();
         
-        const char* types[] = { "Actor", "Light", "Camera", "Mesh", "Audio", "Particle", "UI" };
-        
-        for (const char* type : types) {
-            bool enabled = s_State.TypeFilters.find(type) == s_State.TypeFilters.end();
-            if (ImGui::Checkbox(type, &enabled)) {
-                if (enabled) {
-                    s_State.TypeFilters.erase(type);
-                } else {
-                    s_State.TypeFilters.insert(type);
+        // Results list
+        for (size_t i = 0; i < s_State.SearchResults.size(); ++i) {
+            const auto& tmpl = s_State.SearchResults[i];
+            bool isSelected = (int)i == s_State.SelectedSearchIndex;
+            
+            if (ImGui::Selectable(tmpl.Name.c_str(), isSelected)) {
+                // Create node
+                FNode newNode = CreateNodeFromTemplate(tmpl, s_State.NewNodePosition);
+                s_CurrentGraph.Nodes[newNode.ID] = newNode;
+                s_CurrentGraph.bIsModified = true;
+                
+                // Connect if we started from a pin
+                if (s_State.NewLinkStartPin != 0) {
+                    // Find compatible pin on new node
+                    // TODO: Implement automatic connection
                 }
-                s_State.bNeedsRefilter = true;
+                
+                s_State.bShowNewNodeMenu = false;
+                searchBuf[0] = '\0';
             }
+            
+            if (ImGui::IsItemHovered() && !tmpl.Description.empty()) {
+                ImGui::SetTooltip("%s", tmpl.Description.c_str());
+            }
+        }
+        
+        // Handle keyboard navigation
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) && 
+            s_State.SelectedSearchIndex < (int)s_State.SearchResults.size() - 1) {
+            s_State.SelectedSearchIndex++;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && s_State.SelectedSearchIndex > 0) {
+            s_State.SelectedSearchIndex--;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter) && s_State.SelectedSearchIndex >= 0) {
+            const auto& tmpl = s_State.SearchResults[s_State.SelectedSearchIndex];
+            FNode newNode = CreateNodeFromTemplate(tmpl, s_State.NewNodePosition);
+            s_CurrentGraph.Nodes[newNode.ID] = newNode;
+            s_CurrentGraph.bIsModified = true;
+            s_State.bShowNewNodeMenu = false;
+            searchBuf[0] = '\0';
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            s_State.bShowNewNodeMenu = false;
+            searchBuf[0] = '\0';
         }
     }
     ImGui::End();
 }
 
 /**
- * @brief Refreshes the node cache from the scene
- * 
- * @param scene The scene system to query
+ * @brief Initializes the node template library
  */
-static void RefreshNodeCache(ISceneSystem* scene) {
-    s_NodeCache.clear();
-    s_RootNodeIDs.clear();
+static void InitializeNodeTemplates() {
+    s_NodeTemplates.clear();
     
-    if (!scene) return;
-    
-    // TODO: Replace with actual scene traversal
-    // scene->ForEachNode([](ISceneNode* node) {
-    //     FHierarchyNode cached;
-    //     cached.ID = node->GetID();
-    //     cached.Name = node->GetName();
-    //     cached.TypeName = node->GetTypeName();
-    //     cached.ParentID = node->GetParentID();
-    //     // etc...
-    //     s_NodeCache[cached.ID] = cached;
-    // });
-    
-    // Mock data for testing
-    for (int i = 1; i <= 10; ++i) {
-        FHierarchyNode node;
-        node.ID = static_cast<uint64_t>(i);
-        node.Name = "Node_" + std::to_string(i);
-        node.TypeName = (i % 3 == 0) ? "Light" : ((i % 2 == 0) ? "Mesh" : "Actor");
-        node.ParentID = (i > 3) ? 1 : 0;  // First 3 are root, rest are children of Node_1
-        node.Depth = (i > 3) ? 1 : 0;
-        s_NodeCache[node.ID] = node;
+    // === Event Nodes ===
+    {
+        FNodeTemplate tmpl;
+        tmpl.Name = "Event BeginPlay";
+        tmpl.ClassName = "K2Node_Event_BeginPlay";
+        tmpl.Description = "Called when the game starts or when the actor is spawned";
+        tmpl.Keywords = "start begin initialize";
+        tmpl.Category = ENodeCategory::Event;
+        tmpl.bIsPure = false;
         
-        if (node.ParentID == 0) {
-            s_RootNodeIDs.push_back(node.ID);
-        }
+        FPin execOut;
+        execOut.Name = "Execute";
+        execOut.Type = EPinType::Flow;
+        execOut.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(execOut);
+        
+        s_NodeTemplates.push_back(tmpl);
     }
     
-    // Build child lists
-    for (auto& [id, node] : s_NodeCache) {
-        if (node.ParentID != 0) {
-            auto parentIt = s_NodeCache.find(node.ParentID);
-            if (parentIt != s_NodeCache.end()) {
-                parentIt->second.ChildIDs.push_back(id);
-            }
-        }
+    {
+        FNodeTemplate tmpl;
+        tmpl.Name = "Event Tick";
+        tmpl.ClassName = "K2Node_Event_Tick";
+        tmpl.Description = "Called every frame";
+        tmpl.Keywords = "update frame";
+        tmpl.Category = ENodeCategory::Event;
+        tmpl.bIsPure = false;
+        
+        FPin execOut;
+        execOut.Name = "Execute";
+        execOut.Type = EPinType::Flow;
+        execOut.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(execOut);
+        
+        FPin deltaTime;
+        deltaTime.Name = "Delta Time";
+        deltaTime.Type = EPinType::Float;
+        deltaTime.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(deltaTime);
+        
+        s_NodeTemplates.push_back(tmpl);
     }
     
-    SortNodes();
+    // === Flow Control ===
+    {
+        FNodeTemplate tmpl;
+        tmpl.Name = "Branch";
+        tmpl.ClassName = "K2Node_Branch";
+        tmpl.Description = "If-else conditional branching";
+        tmpl.Keywords = "if else condition";
+        tmpl.Category = ENodeCategory::Flow;
+        
+        FPin execIn;
+        execIn.Name = "Execute";
+        execIn.Type = EPinType::Flow;
+        execIn.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(execIn);
+        
+        FPin condition;
+        condition.Name = "Condition";
+        condition.Type = EPinType::Bool;
+        condition.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(condition);
+        
+        FPin trueOut;
+        trueOut.Name = "True";
+        trueOut.Type = EPinType::Flow;
+        trueOut.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(trueOut);
+        
+        FPin falseOut;
+        falseOut.Name = "False";
+        falseOut.Type = EPinType::Flow;
+        falseOut.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(falseOut);
+        
+        s_NodeTemplates.push_back(tmpl);
+    }
+    
+    // === Math Nodes ===
+    {
+        FNodeTemplate tmpl;
+        tmpl.Name = "Add (Float)";
+        tmpl.ClassName = "K2Node_Add_Float";
+        tmpl.Description = "Adds two float values";
+        tmpl.Keywords = "plus + sum";
+        tmpl.Category = ENodeCategory::Math;
+        tmpl.bIsPure = true;
+        
+        FPin a;
+        a.Name = "A";
+        a.Type = EPinType::Float;
+        a.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(a);
+        
+        FPin b;
+        b.Name = "B";
+        b.Type = EPinType::Float;
+        b.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(b);
+        
+        FPin result;
+        result.Name = "Result";
+        result.Type = EPinType::Float;
+        result.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(result);
+        
+        s_NodeTemplates.push_back(tmpl);
+    }
+    
+    // === Transform Nodes ===
+    {
+        FNodeTemplate tmpl;
+        tmpl.Name = "Add Local Offset";
+        tmpl.ClassName = "K2Node_AddLocalOffset";
+        tmpl.Description = "Adds an offset to the actor's position in local space";
+        tmpl.Keywords = "move translate position";
+        tmpl.Category = ENodeCategory::Transform;
+        
+        FPin execIn;
+        execIn.Name = "Execute";
+        execIn.Type = EPinType::Flow;
+        execIn.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(execIn);
+        
+        FPin delta;
+        delta.Name = "Delta Location";
+        delta.Type = EPinType::Vector3;
+        delta.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(delta);
+        
+        FPin execOut;
+        execOut.Name = "Then";
+        execOut.Type = EPinType::Flow;
+        execOut.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(execOut);
+        
+        s_NodeTemplates.push_back(tmpl);
+    }
+    
+    // === Debug Nodes ===
+    {
+        FNodeTemplate tmpl;
+        tmpl.Name = "Print String";
+        tmpl.ClassName = "K2Node_PrintString";
+        tmpl.Description = "Prints a string to the output log";
+        tmpl.Keywords = "log debug console";
+        tmpl.Category = ENodeCategory::Debug;
+        
+        FPin execIn;
+        execIn.Name = "Execute";
+        execIn.Type = EPinType::Flow;
+        execIn.Direction = EPinDirection::Input;
+        tmpl.InputPins.push_back(execIn);
+        
+        FPin message;
+        message.Name = "String";
+        message.Type = EPinType::String;
+        message.Direction = EPinDirection::Input;
+        message.DefaultValue = "Hello";
+        tmpl.InputPins.push_back(message);
+        
+        FPin execOut;
+        execOut.Name = "Then";
+        execOut.Type = EPinType::Flow;
+        execOut.Direction = EPinDirection::Output;
+        tmpl.OutputPins.push_back(execOut);
+        
+        s_NodeTemplates.push_back(tmpl);
+    }
+    
+    // TODO: Add more node templates for:
+    // - Variable Get/Set
+    // - For/While loops
+    // - Switch/Select
+    // - Component access
+    // - Physics operations
+    // - Audio playback
+    // - Timer functions
+    // - Array operations
+    // - String manipulation
+    // - Custom events/functions
 }
 
 /**
- * @brief Applies current filters to all cached nodes
+ * @brief Creates a new node from a template
+ * 
+ * @param tmpl The template to use
+ * @param position Position in graph space
+ * @return The created node
  */
-static void ApplyFilters() {
-    // Reset filter state
-    for (auto& [id, node] : s_NodeCache) {
-        node.bMatchesFilter = NodePassesFilter(node);
-        node.bHasMatchingChild = false;
+static FNode CreateNodeFromTemplate(const FNodeTemplate& tmpl, const ImVec2& position) {
+    FNode node;
+    node.ID = s_CurrentGraph.GenerateID();
+    node.Name = tmpl.Name;
+    node.ClassName = tmpl.ClassName;
+    node.Category = tmpl.Category;
+    node.Position = position;
+    node.bIsPure = tmpl.bIsPure;
+    
+    // Create pins with unique IDs
+    for (const auto& pinTmpl : tmpl.InputPins) {
+        FPin pin = pinTmpl;
+        pin.ID = s_CurrentGraph.GenerateID();
+        pin.NodeID = node.ID;
+        node.InputPins.push_back(pin);
+        s_CurrentGraph.Pins[pin.ID] = pin;
     }
     
-    // Propagate matching state up to parents
-    for (auto& [id, node] : s_NodeCache) {
-        if (node.bMatchesFilter) {
-            PropagateFilterToParents(node.ParentID);
-        }
+    for (const auto& pinTmpl : tmpl.OutputPins) {
+        FPin pin = pinTmpl;
+        pin.ID = s_CurrentGraph.GenerateID();
+        pin.NodeID = node.ID;
+        node.OutputPins.push_back(pin);
+        s_CurrentGraph.Pins[pin.ID] = pin;
     }
     
-    FlattenVisibleNodes();
+    return node;
 }
 
 /**
- * @brief Checks if a node passes the current filter
+ * @brief Checks if a link can be created between two pins
  * 
- * @param node The node to check
- * @return true if the node should be visible
+ * @param startPinID Source pin ID
+ * @param endPinID Destination pin ID
+ * @return true if the connection is valid
  */
-static bool NodePassesFilter(const FHierarchyNode& node) {
-    // Search filter
-    if (s_State.SearchBuffer[0] != '\0') {
-        std::string searchLower = s_State.SearchBuffer;
-        std::transform(searchLower.begin(), searchLower.end(), searchLower.begin(), ::tolower);
-        
-        std::string nameLower = node.Name;
-        std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
-        
-        if (nameLower.find(searchLower) == std::string::npos) {
-            return false;
-        }
+static bool CanCreateLink(uint64_t startPinID, uint64_t endPinID) {
+    auto startIt = s_CurrentGraph.Pins.find(startPinID);
+    auto endIt = s_CurrentGraph.Pins.find(endPinID);
+    
+    if (startIt == s_CurrentGraph.Pins.end() || endIt == s_CurrentGraph.Pins.end()) {
+        return false;
     }
     
-    // Type filter
-    if (s_State.TypeFilters.find(node.TypeName) != s_State.TypeFilters.end()) {
+    const FPin& startPin = startIt->second;
+    const FPin& endPin = endIt->second;
+    
+    // Can't connect to same node
+    if (startPin.NodeID == endPin.NodeID) {
+        return false;
+    }
+    
+    // Must be opposite directions
+    if (startPin.Direction == endPin.Direction) {
+        return false;
+    }
+    
+    // Type compatibility (simplified)
+    if (startPin.Type != endPin.Type && 
+        startPin.Type != EPinType::Wildcard && 
+        endPin.Type != EPinType::Wildcard) {
+        // TODO: Add type conversion rules
         return false;
     }
     
@@ -785,309 +1257,83 @@ static bool NodePassesFilter(const FHierarchyNode& node) {
 }
 
 /**
- * @brief Propagates matching filter state up to parents
+ * @brief Creates a link between two pins
  * 
- * @param nodeID The node to start propagation from
+ * @param startPinID Source pin ID
+ * @param endPinID Destination pin ID
  */
-static void PropagateFilterToParents(uint64_t nodeID) {
-    if (nodeID == 0) return;
+static void CreateLink(uint64_t startPinID, uint64_t endPinID) {
+    FLink link;
+    link.ID = s_CurrentGraph.GenerateID();
+    link.StartPinID = startPinID;
+    link.EndPinID = endPinID;
     
-    auto it = s_NodeCache.find(nodeID);
-    if (it != s_NodeCache.end()) {
-        it->second.bHasMatchingChild = true;
-        PropagateFilterToParents(it->second.ParentID);
+    // Set color based on pin type
+    auto pinIt = s_CurrentGraph.Pins.find(startPinID);
+    if (pinIt != s_CurrentGraph.Pins.end()) {
+        link.Color = GetPinColor(pinIt->second.Type);
     }
+    
+    s_CurrentGraph.Links[link.ID] = link;
+    s_CurrentGraph.bIsModified = true;
+    
+    // Mark pins as connected
+    auto startIt = s_CurrentGraph.Pins.find(startPinID);
+    auto endIt = s_CurrentGraph.Pins.find(endPinID);
+    if (startIt != s_CurrentGraph.Pins.end()) startIt->second.bIsConnected = true;
+    if (endIt != s_CurrentGraph.Pins.end()) endIt->second.bIsConnected = true;
 }
 
 /**
- * @brief Sorts nodes based on current sort mode
- */
-static void SortNodes() {
-    auto sortFunc = [](uint64_t a, uint64_t b) {
-        auto itA = s_NodeCache.find(a);
-        auto itB = s_NodeCache.find(b);
-        if (itA == s_NodeCache.end() || itB == s_NodeCache.end()) return false;
-        
-        switch (s_State.SortMode) {
-            case ENodeSortMode::Alphabetical:
-                return s_State.bSortAscending 
-                    ? itA->second.Name < itB->second.Name 
-                    : itA->second.Name > itB->second.Name;
-            case ENodeSortMode::Type:
-                return s_State.bSortAscending 
-                    ? itA->second.TypeName < itB->second.TypeName 
-                    : itA->second.TypeName > itB->second.TypeName;
-            default:
-                return a < b;  // Creation order
-        }
-    };
-    
-    std::sort(s_RootNodeIDs.begin(), s_RootNodeIDs.end(), sortFunc);
-    
-    for (auto& [id, node] : s_NodeCache) {
-        std::sort(node.ChildIDs.begin(), node.ChildIDs.end(), sortFunc);
-    }
-}
-
-/**
- * @brief Builds a flattened list of visible nodes for keyboard navigation
- */
-static void FlattenVisibleNodes() {
-    s_FlattenedVisibleNodes.clear();
-    
-    std::function<void(uint64_t)> flatten = [&](uint64_t nodeID) {
-        auto it = s_NodeCache.find(nodeID);
-        if (it == s_NodeCache.end()) return;
-        if (!it->second.bMatchesFilter && !it->second.bHasMatchingChild) return;
-        
-        s_FlattenedVisibleNodes.push_back(nodeID);
-        
-        if (it->second.bIsExpanded) {
-            for (uint64_t childID : it->second.ChildIDs) {
-                flatten(childID);
-            }
-        }
-    };
-    
-    for (uint64_t rootID : s_RootNodeIDs) {
-        flatten(rootID);
-    }
-}
-
-/**
- * @brief Handles node selection with modifier keys
+ * @brief Deletes a link
  * 
- * @param nodeID The clicked node
- * @param isCtrlHeld Whether Ctrl is held (toggle selection)
- * @param isShiftHeld Whether Shift is held (range selection)
+ * @param linkID The link ID to delete
  */
-static void HandleSelection(uint64_t nodeID, bool isCtrlHeld, bool isShiftHeld) {
-    auto it = s_NodeCache.find(nodeID);
-    if (it == s_NodeCache.end()) return;
+static void DeleteLink(uint64_t linkID) {
+    auto it = s_CurrentGraph.Links.find(linkID);
+    if (it == s_CurrentGraph.Links.end()) return;
     
-    if (isCtrlHeld) {
-        // Toggle selection
-        if (it->second.bIsSelected) {
-            s_State.SelectedNodeIDs.erase(nodeID);
-            it->second.bIsSelected = false;
-        } else {
-            s_State.SelectedNodeIDs.insert(nodeID);
-            it->second.bIsSelected = true;
-        }
-    } else if (isShiftHeld && s_State.LastClickedNodeID != 0) {
-        // Range selection
-        auto startIt = std::find(s_FlattenedVisibleNodes.begin(), s_FlattenedVisibleNodes.end(), s_State.LastClickedNodeID);
-        auto endIt = std::find(s_FlattenedVisibleNodes.begin(), s_FlattenedVisibleNodes.end(), nodeID);
-        
-        if (startIt != s_FlattenedVisibleNodes.end() && endIt != s_FlattenedVisibleNodes.end()) {
-            if (startIt > endIt) std::swap(startIt, endIt);
-            
-            for (auto rangeIt = startIt; rangeIt <= endIt; ++rangeIt) {
-                s_State.SelectedNodeIDs.insert(*rangeIt);
-                auto nodeIt = s_NodeCache.find(*rangeIt);
-                if (nodeIt != s_NodeCache.end()) {
-                    nodeIt->second.bIsSelected = true;
-                }
-            }
-        }
-    } else {
-        // Single selection
-        for (auto& [id, node] : s_NodeCache) {
-            node.bIsSelected = false;
-        }
-        s_State.SelectedNodeIDs.clear();
-        
-        s_State.SelectedNodeIDs.insert(nodeID);
-        it->second.bIsSelected = true;
-    }
+    // Unmark pins as connected
+    // TODO: Check if pins have other connections
     
-    s_State.FocusedNodeID = nodeID;
-    
-    // TODO: Broadcast selection change
-    // EventDispatcher::Broadcast<HierarchySelectionChangedEvent>(s_State.SelectedNodeIDs);
+    s_CurrentGraph.Links.erase(it);
+    s_CurrentGraph.bIsModified = true;
 }
 
 /**
- * @brief Handles drag-drop for a node
- * 
- * @param node The target node
- * @param scene The scene system
- * @param cb Command buffer
+ * @brief Deletes all selected nodes
  */
-static void HandleDragDrop(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb) {
-    (void)scene; (void)cb;
-    
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_NODE")) {
-            uint64_t droppedID = *(uint64_t*)payload->Data;
-            
-            // Don't allow dropping onto self or descendants
-            if (droppedID != node.ID) {
-                // TODO: Reparent node
-                // scene->ReparentNode(droppedID, node.ID);
-                // cb.Push({EditorCommandType::ReparentNode, droppedID, node.ID});
-                s_State.bNeedsRefresh = true;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
-}
-
-/**
- * @brief Handles keyboard navigation in the hierarchy
- * 
- * @param scene The scene system
- * @param cb Command buffer
- */
-static void HandleKeyboardNavigation(ISceneSystem* scene, CommandBuffer& cb) {
-    if (!ImGui::IsWindowFocused()) return;
-    
-    ImGuiIO& io = ImGui::GetIO();
-    
-    // Delete
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !s_State.SelectedNodeIDs.empty()) {
-        DeleteSelectedNodes(scene, cb);
-    }
-    
-    // F2 - Rename
-    if (ImGui::IsKeyPressed(ImGuiKey_F2) && s_State.SelectedNodeIDs.size() == 1) {
-        uint64_t nodeID = *s_State.SelectedNodeIDs.begin();
-        auto it = s_NodeCache.find(nodeID);
-        if (it != s_NodeCache.end()) {
-            it->second.bIsRenaming = true;
-            s_State.RenamingNodeID = nodeID;
-            strncpy(s_State.RenameBuffer, it->second.Name.c_str(), sizeof(s_State.RenameBuffer) - 1);
-        }
-    }
-    
-    // Ctrl+A - Select all
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A)) {
-        SelectAll();
-    }
-    
-    // Escape - Deselect
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-        DeselectAll();
-    }
-    
-    // Ctrl+D - Duplicate
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D) && !s_State.SelectedNodeIDs.empty()) {
-        DuplicateSelectedNodes(scene, cb);
-    }
-    
-    // Ctrl+C - Copy
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C)) {
-        CopySelectedNodes();
-    }
-    
-    // Ctrl+V - Paste
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
-        PasteNodes(scene, cb);
-    }
-    
-    // F - Focus
-    if (ImGui::IsKeyPressed(ImGuiKey_F) && !s_State.SelectedNodeIDs.empty()) {
-        FocusNodeInViewport(*s_State.SelectedNodeIDs.begin());
-    }
-    
-    // Arrow key navigation
-    if (!s_FlattenedVisibleNodes.empty() && s_State.FocusedNodeID != 0) {
-        auto currentIt = std::find(s_FlattenedVisibleNodes.begin(), s_FlattenedVisibleNodes.end(), s_State.FocusedNodeID);
-        
-        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && currentIt != s_FlattenedVisibleNodes.begin()) {
-            --currentIt;
-            HandleSelection(*currentIt, io.KeyCtrl, io.KeyShift);
-        }
-        
-        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) && currentIt != s_FlattenedVisibleNodes.end() - 1) {
-            ++currentIt;
-            HandleSelection(*currentIt, io.KeyCtrl, io.KeyShift);
-        }
-    }
-}
-
-/**
- * @brief Handles rename confirmation
- * 
- * @param node The node being renamed
- * @param scene The scene system
- * @param cb Command buffer
- */
-static void HandleRename(FHierarchyNode& node, ISceneSystem* scene, CommandBuffer& cb) {
-    (void)scene; (void)cb;
-    
-    if (s_State.RenameBuffer[0] != '\0') {
-        // TODO: Apply rename to scene
-        // scene->RenameNode(node.ID, s_State.RenameBuffer);
-        // cb.Push({EditorCommandType::RenameNode, node.ID, node.Name, s_State.RenameBuffer});
-        
-        node.Name = s_State.RenameBuffer;
-    }
-    
-    node.bIsRenaming = false;
-    s_State.RenamingNodeID = 0;
-}
-
-/**
- * @brief Selects all visible nodes
- */
-static void SelectAll() {
-    s_State.SelectedNodeIDs.clear();
-    for (auto& [id, node] : s_NodeCache) {
-        if (node.bMatchesFilter || node.bHasMatchingChild) {
-            node.bIsSelected = true;
-            s_State.SelectedNodeIDs.insert(id);
-        }
-    }
-}
-
-/**
- * @brief Deselects all nodes
- */
-static void DeselectAll() {
-    for (auto& [id, node] : s_NodeCache) {
-        node.bIsSelected = false;
-    }
-    s_State.SelectedNodeIDs.clear();
-    s_State.FocusedNodeID = 0;
-}
-
-/**
- * @brief Deletes selected nodes
- * 
- * @param scene The scene system
- * @param cb Command buffer
- */
-static void DeleteSelectedNodes(ISceneSystem* scene, CommandBuffer& cb) {
-    (void)scene;
-    
+static void DeleteSelectedNodes() {
     for (uint64_t nodeID : s_State.SelectedNodeIDs) {
-        // TODO: Delete from scene
-        // scene->DeleteNode(nodeID);
-        cb.Push({EditorCommandType::DeleteEntity, std::to_string(nodeID)});
+        s_CurrentGraph.Nodes.erase(nodeID);
+        
+        // Delete associated links
+        std::vector<uint64_t> linksToDelete;
+        for (const auto& [linkID, link] : s_CurrentGraph.Links) {
+            auto startPinIt = s_CurrentGraph.Pins.find(link.StartPinID);
+            auto endPinIt = s_CurrentGraph.Pins.find(link.EndPinID);
+            
+            if ((startPinIt != s_CurrentGraph.Pins.end() && startPinIt->second.NodeID == nodeID) ||
+                (endPinIt != s_CurrentGraph.Pins.end() && endPinIt->second.NodeID == nodeID)) {
+                linksToDelete.push_back(linkID);
+            }
+        }
+        
+        for (uint64_t linkID : linksToDelete) {
+            s_CurrentGraph.Links.erase(linkID);
+        }
     }
     
-    DeselectAll();
-    s_State.bNeedsRefresh = true;
+    s_State.SelectedNodeIDs.clear();
+    s_CurrentGraph.bIsModified = true;
 }
 
 /**
  * @brief Duplicates selected nodes
- * 
- * @param scene The scene system
- * @param cb Command buffer
  */
-static void DuplicateSelectedNodes(ISceneSystem* scene, CommandBuffer& cb) {
-    (void)scene; (void)cb;
-    
-    for (uint64_t nodeID : s_State.SelectedNodeIDs) {
-        // TODO: Duplicate in scene
-        // uint64_t newID = scene->DuplicateNode(nodeID);
-        // cb.Push({EditorCommandType::DuplicateEntity, nodeID, newID});
-        (void)nodeID;
-    }
-    
-    s_State.bNeedsRefresh = true;
+static void DuplicateSelectedNodes() {
+    // TODO: Implement node duplication with offset
+    s_CurrentGraph.bIsModified = true;
 }
 
 /**
@@ -1095,73 +1341,226 @@ static void DuplicateSelectedNodes(ISceneSystem* scene, CommandBuffer& cb) {
  */
 static void CopySelectedNodes() {
     // TODO: Serialize selected nodes to clipboard
-    // std::string serialized = SceneSerializer::SerializeNodes(s_State.SelectedNodeIDs);
-    // Clipboard::SetText(serialized);
 }
 
 /**
  * @brief Pastes nodes from clipboard
- * 
- * @param scene The scene system
- * @param cb Command buffer
- * @param parentID Parent to paste under (0 for root)
  */
-static void PasteNodes(ISceneSystem* scene, CommandBuffer& cb, uint64_t parentID) {
-    (void)scene; (void)cb; (void)parentID;
-    
+static void PasteNodes() {
     // TODO: Deserialize nodes from clipboard
-    // std::string serialized = Clipboard::GetText();
-    // auto newNodes = SceneSerializer::DeserializeNodes(serialized, parentID);
-    // for (auto& node : newNodes) {
-    //     scene->AddNode(node);
-    //     cb.Push({EditorCommandType::SpawnEntity, node.ID});
-    // }
+    s_CurrentGraph.bIsModified = true;
+}
+
+/**
+ * @brief Handles keyboard shortcuts
+ */
+static void HandleKeyboardShortcuts() {
+    if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) return;
     
-    s_State.bNeedsRefresh = true;
+    ImGuiIO& io = ImGui::GetIO();
+    
+    // Ctrl+S - Save
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+        SaveScript();
+    }
+    
+    // Ctrl+Z - Undo
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+        // TODO: Undo
+    }
+    
+    // Ctrl+Y - Redo
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y)) {
+        // TODO: Redo
+    }
+    
+    // Delete - Delete selected
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !s_State.SelectedNodeIDs.empty()) {
+        DeleteSelectedNodes();
+    }
+    
+    // Ctrl+D - Duplicate
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D)) {
+        DuplicateSelectedNodes();
+    }
+    
+    // Tab - Open node search
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab) && !s_State.bShowNewNodeMenu) {
+        s_State.bShowNewNodeMenu = true;
+        s_State.NewNodePosition = ImGui::GetMousePos();
+        s_State.NewLinkStartPin = 0;
+    }
+    
+    // F5 - Start/Stop debugging
+    if (ImGui::IsKeyPressed(ImGuiKey_F5)) {
+        if (io.KeyShift) {
+            s_State.bIsDebugging = false;
+            s_State.bIsPaused = false;
+        } else {
+            s_State.bIsDebugging = true;
+        }
+    }
+    
+    // F7 - Compile
+    if (ImGui::IsKeyPressed(ImGuiKey_F7)) {
+        // TODO: Compile script
+    }
 }
 
 /**
- * @brief Focuses camera on a node in the viewport
- * 
- * @param nodeID The node to focus on
+ * @brief Handles context menu
  */
-static void FocusNodeInViewport(uint64_t nodeID) {
-    (void)nodeID;
-    // TODO: Tell viewport to focus on this node
-    // Viewport::FocusOnNode(nodeID);
-    // EventDispatcher::Broadcast<FocusNodeEvent>(nodeID);
+static void HandleContextMenu() {
+    // Background context menu
+    if (ed::ShowBackgroundContextMenu()) {
+        ImGui::OpenPopup("BackgroundContextMenu");
+        s_State.NewNodePosition = ImGui::GetMousePos();
+    }
+    
+    if (ImGui::BeginPopup("BackgroundContextMenu")) {
+        if (ImGui::MenuItem("Create Node...")) {
+            s_State.bShowNewNodeMenu = true;
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Paste", "Ctrl+V")) {
+            PasteNodes();
+        }
+        ImGui::EndPopup();
+    }
+    
+    // Node context menu
+    ed::NodeId nodeId;
+    if (ed::ShowNodeContextMenu(&nodeId)) {
+        ImGui::OpenPopup("NodeContextMenu");
+    }
+    
+    if (ImGui::BeginPopup("NodeContextMenu")) {
+        if (ImGui::MenuItem("Delete", "Delete")) {
+            DeleteSelectedNodes();
+        }
+        if (ImGui::MenuItem("Duplicate", "Ctrl+D")) {
+            DuplicateSelectedNodes();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Copy", "Ctrl+C")) {
+            CopySelectedNodes();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 /**
- * @brief Gets an icon for a node type
- * 
- * @param typeName The type name
- * @return Icon text (TODO: Replace with FontAwesome glyphs)
+ * @brief Updates debug state
  */
-static const char* GetNodeTypeIcon(const std::string& typeName) {
-    if (typeName == "Light") return "[L]";
-    if (typeName == "Camera") return "[C]";
-    if (typeName == "Mesh") return "[M]";
-    if (typeName == "Audio") return "[A]";
-    if (typeName == "Particle") return "[P]";
-    if (typeName == "UI") return "[U]";
-    return "[O]";  // Object/Actor
+static void UpdateDebugState() {
+    // TODO: Query script VM for current execution state
+    // Update node states, breakpoints, variable values, etc.
 }
 
 /**
- * @brief Gets a color for a node type
+ * @brief Gets the color for a pin type
  * 
- * @param typeName The type name
- * @return ImGui color
+ * @param type The pin type
+ * @return ImVec4 color
  */
-static ImVec4 GetNodeTypeColor(const std::string& typeName) {
-    if (typeName == "Light") return ImVec4(1.0f, 0.9f, 0.4f, 1.0f);    // Yellow
-    if (typeName == "Camera") return ImVec4(0.4f, 0.7f, 1.0f, 1.0f);   // Blue
-    if (typeName == "Mesh") return ImVec4(0.5f, 0.8f, 0.5f, 1.0f);     // Green
-    if (typeName == "Audio") return ImVec4(0.9f, 0.5f, 0.2f, 1.0f);    // Orange
-    if (typeName == "Particle") return ImVec4(0.9f, 0.4f, 0.9f, 1.0f); // Magenta
-    if (typeName == "UI") return ImVec4(0.3f, 0.9f, 0.9f, 1.0f);       // Cyan
-    return ImVec4(0.8f, 0.8f, 0.8f, 1.0f);  // Gray
+static ImVec4 GetPinColor(EPinType type) {
+    switch (type) {
+        case EPinType::Flow:    return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // White
+        case EPinType::Bool:    return ImVec4(0.9f, 0.2f, 0.2f, 1.0f);  // Red
+        case EPinType::Int:     return ImVec4(0.2f, 0.8f, 0.8f, 1.0f);  // Cyan
+        case EPinType::Float:   return ImVec4(0.4f, 0.9f, 0.4f, 1.0f);  // Green
+        case EPinType::String:  return ImVec4(0.9f, 0.2f, 0.9f, 1.0f);  // Magenta
+        case EPinType::Vector2:
+        case EPinType::Vector3:
+        case EPinType::Vector4: return ImVec4(0.9f, 0.9f, 0.2f, 1.0f);  // Yellow
+        case EPinType::Color:   return ImVec4(0.9f, 0.5f, 0.2f, 1.0f);  // Orange
+        case EPinType::Object:  return ImVec4(0.2f, 0.4f, 0.9f, 1.0f);  // Blue
+        case EPinType::Struct:  return ImVec4(0.5f, 0.2f, 0.7f, 1.0f);  // Purple
+        case EPinType::Array:   return ImVec4(0.2f, 0.7f, 0.7f, 1.0f);  // Teal
+        case EPinType::Wildcard:return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  // Gray
+        case EPinType::Delegate:return ImVec4(0.9f, 0.3f, 0.3f, 1.0f);  // Red outline
+        default:                return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    }
 }
+
+/**
+ * @brief Gets the name of a pin type
+ * 
+ * @param type The pin type
+ * @return Type name string
+ */
+static const char* GetPinTypeName(EPinType type) {
+    switch (type) {
+        case EPinType::Flow:    return "Execution";
+        case EPinType::Bool:    return "Boolean";
+        case EPinType::Int:     return "Integer";
+        case EPinType::Float:   return "Float";
+        case EPinType::String:  return "String";
+        case EPinType::Vector2: return "Vector2";
+        case EPinType::Vector3: return "Vector3";
+        case EPinType::Vector4: return "Vector4";
+        case EPinType::Color:   return "Color";
+        case EPinType::Object:  return "Object Reference";
+        case EPinType::Struct:  return "Struct";
+        case EPinType::Array:   return "Array";
+        case EPinType::Wildcard:return "Wildcard";
+        case EPinType::Delegate:return "Event Delegate";
+        default:                return "Unknown";
+    }
+}
+
+/**
+ * @brief Gets the name of a category
+ * 
+ * @param category The category
+ * @return Category name string
+ */
+static const char* GetCategoryName(ENodeCategory category) {
+    switch (category) {
+        case ENodeCategory::Event:     return "Events";
+        case ENodeCategory::Flow:      return "Flow Control";
+        case ENodeCategory::Math:      return "Math";
+        case ENodeCategory::String:    return "String";
+        case ENodeCategory::Transform: return "Transform";
+        case ENodeCategory::Actor:     return "Actor";
+        case ENodeCategory::Component: return "Components";
+        case ENodeCategory::Physics:   return "Physics";
+        case ENodeCategory::Input:     return "Input";
+        case ENodeCategory::Debug:     return "Debug";
+        case ENodeCategory::Variable:  return "Variables";
+        case ENodeCategory::Function:  return "Functions";
+        case ENodeCategory::Macro:     return "Macros";
+        case ENodeCategory::Custom:    return "Custom";
+        default:                       return "Other";
+    }
+}
+
+/**
+ * @brief Gets an icon for a category
+ * 
+ * @param category The category
+ * @return Icon text
+ */
+static const char* GetCategoryIcon(ENodeCategory category) {
+    switch (category) {
+        case ENodeCategory::Event:     return "[E]";
+        case ENodeCategory::Flow:      return "[F]";
+        case ENodeCategory::Math:      return "[M]";
+        case ENodeCategory::String:    return "[S]";
+        case ENodeCategory::Transform: return "[T]";
+        case ENodeCategory::Actor:     return "[A]";
+        case ENodeCategory::Component: return "[C]";
+        case ENodeCategory::Physics:   return "[P]";
+        case ENodeCategory::Input:     return "[I]";
+        case ENodeCategory::Debug:     return "[D]";
+        case ENodeCategory::Variable:  return "[V]";
+        case ENodeCategory::Function:  return "[Fn]";
+        case ENodeCategory::Macro:     return "[Mc]";
+        default:                       return "[?]";
+    }
+}
+
+// Static member for editor context
+ed::EditorContext* VisualScriptingPanel::m_EditorContext = nullptr;
 
 } // namespace RiftCore::UI
