@@ -575,7 +575,7 @@ static void DrawNodePalette() {
  * @brief Draws the main node graph canvas
  */
 static void DrawNodeGraph() {
-    ed::SetCurrentEditor(m_EditorContext);
+    ed::SetCurrentEditor(VisualScriptingPanel::m_EditorContext);
     
     // Style customization
     ed::PushStyleColor(ed::StyleColor_Bg, ImColor(25, 25, 28, 255));
