@@ -76,7 +76,8 @@ enum class ERenderMode : uint8_t {
     VertexColors,       ///< Vertex color display
     Overdraw,           ///< Overdraw visualization
     QuadOverdraw,       ///< Quad overdraw visualization
-    LightmapDensity     ///< Lightmap density visualization
+    LightmapDensity,    ///< Lightmap density visualization
+    COUNT               ///< Number of render modes
 };
 
 /**
