@@ -281,7 +281,7 @@ void HierarchyPanel::OnUIRender(ISceneSystem* scene, CommandBuffer& cb) {
  * 
  * @return Selected node ID, or 0 if nothing selected
  */
-uint64_t HierarchyPanel::GetSelectedNode() const {
+SceneNodeID HierarchyPanel::GetSelectedNode() const {
     return m_SelectedNode;
 }
 
