@@ -184,152 +184,55 @@ struct FAssetBrowserState {
 class AssetBrowserPanel {
 public:
     //-------------------------------------------------------------------------
-    // Lifecycle
+    // Lifecycle / Navigation / Selection / Operations / Configuration (all inline stubs)
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Initializes the asset browser panel
-     * 
-     * Sets up thumbnail cache, registers asset type handlers,
-     * and loads user preferences.
-     */
-    void Initialize();
-    
-    /**
-     * @brief Shuts down the panel and releases resources
-     */
-    void Shutdown();
+    void Initialize() {}
+    void Shutdown() {}
     
     //-------------------------------------------------------------------------
     // Rendering
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Main render function called every frame
-     */
     void OnUIRender();
     
     //-------------------------------------------------------------------------
     // Navigation
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Navigates to the specified directory
-     * @param path Relative path from asset root
-     */
-    void NavigateTo(const std::string& path);
-    
-    /**
-     * @brief Navigates up one directory level
-     */
-    void NavigateUp();
-    
-    /**
-     * @brief Navigates back in history
-     */
-    void NavigateBack();
-    
-    /**
-     * @brief Navigates forward in history
-     */
-    void NavigateForward();
-    
-    /**
-     * @brief Refreshes the current directory contents
-     */
-    void Refresh();
+    void NavigateTo(const std::string& path) { m_CurrentDirectory = path; m_bNeedsRefresh = true; }
+    void NavigateUp() { m_bNeedsRefresh = true; }
+    void NavigateBack() { m_bNeedsRefresh = true; }
+    void NavigateForward() { m_bNeedsRefresh = true; }
+    void Refresh() { m_bNeedsRefresh = true; }
     
     //-------------------------------------------------------------------------
-    // Selection
+    // Selection / Operations / Configuration
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Gets the currently selected assets
-     * @return Vector of selected asset entries
-     */
-    std::vector<FAssetEntry> GetSelectedAssets() const;
-    
-    /**
-     * @brief Clears the current selection
-     */
-    void ClearSelection();
-    
-    /**
-     * @brief Selects an asset by ID
-     * @param assetID The asset to select
-     * @param addToSelection If true, adds to existing selection
-     */
-    void SelectAsset(uint64_t assetID, bool addToSelection = false);
-    
-    //-------------------------------------------------------------------------
-    // Operations
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Creates a new folder in the current directory
-     * @param name Folder name
-     */
-    void CreateFolder(const std::string& name = "New Folder");
-    
-    /**
-     * @brief Deletes the selected assets
-     * @param bPermanent If true, permanently deletes; otherwise moves to trash
-     */
-    void DeleteSelected(bool bPermanent = false);
-    
-    /**
-     * @brief Duplicates the selected assets
-     */
-    void DuplicateSelected();
-    
-    /**
-     * @brief Renames the specified asset
-     * @param assetID Asset to rename
-     * @param newName New name
-     */
-    void RenameAsset(uint64_t assetID, const std::string& newName);
-    
-    //-------------------------------------------------------------------------
-    // Configuration
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Sets the view mode
-     * @param mode Grid, List, or Columns
-     */
-    void SetViewMode(EViewMode mode);
-    
-    /**
-     * @brief Sets the sort mode
-     * @param mode Sorting criterion
-     */
-    void SetSortMode(EAssetSortMode mode);
-    
-    /**
-     * @brief Sets the thumbnail size (for grid view)
-     * @param size Size in pixels (64-256)
-     */
-    void SetThumbnailSize(float size);
-    
-    /**
-     * @brief Gets the current filter settings
-     * @return Reference to filter struct
-     */
-    FAssetFilter& GetFilter();
+    std::vector<FAssetEntry> GetSelectedAssets() const { return {}; }
+    void ClearSelection() {}
+    void SelectAsset(uint64_t /*assetID*/, bool /*addToSelection*/ = false) {}
+    void CreateFolder(const std::string& /*name*/ = "New Folder") {}
+    void DeleteSelected(bool /*bPermanent*/ = false) {}
+    void DuplicateSelected() {}
+    void RenameAsset(uint64_t /*assetID*/, const std::string& /*newName*/) {}
+    void SetViewMode(EViewMode mode) { m_ViewMode = mode; }
+    void SetSortMode(EAssetSortMode mode) { m_SortMode = mode; }
+    void SetThumbnailSize(float size) { m_ThumbnailSize = size; }
+    FAssetFilter& GetFilter() { return m_Filter; }
     
     //-------------------------------------------------------------------------
     // Callbacks
     //-------------------------------------------------------------------------
     
-    /** Callback for asset double-click (open) */
     using AssetOpenCallback = std::function<void(const FAssetEntry&)>;
-    
-    /** Callback for drag-drop onto scene */
     using AssetDropCallback = std::function<void(const std::vector<FAssetEntry>&)>;
     
-    void SetOnAssetOpen(AssetOpenCallback callback);
-    void SetOnAssetDrop(AssetDropCallback callback);
-    
+    void SetOnAssetOpen(AssetOpenCallback callback) { m_OnAssetOpen = callback; }
+    void SetOnAssetDrop(AssetDropCallback callback) { m_OnAssetDrop = callback; }
+
+
 private:
     //-------------------------------------------------------------------------
     // Internal State
@@ -338,40 +241,21 @@ private:
     std::string             m_CurrentDirectory;
     std::string             m_RootDirectory;
     std::vector<std::string> m_PathHistory;
-    int                     m_HistoryIndex;
+    int                     m_HistoryIndex = -1;
     
     std::vector<FAssetEntry> m_Entries;
     std::vector<FAssetEntry> m_FilteredEntries;
     
-    EViewMode               m_ViewMode;
-    EAssetSortMode          m_SortMode;
+    EViewMode               m_ViewMode = EViewMode::Grid;
+    EAssetSortMode          m_SortMode = EAssetSortMode::Name_Ascending;
     FAssetFilter            m_Filter;
-    float                   m_ThumbnailSize;
+    float                   m_ThumbnailSize = 96.0f;
     
-    char                    m_SearchBuffer[256];
-    bool                    m_bNeedsRefresh;
+    char                    m_SearchBuffer[256] = {};
+    bool                    m_bNeedsRefresh = false;
     
     AssetOpenCallback       m_OnAssetOpen;
     AssetDropCallback       m_OnAssetDrop;
-    
-    //-------------------------------------------------------------------------
-    // Internal Methods
-    //-------------------------------------------------------------------------
-    
-    void DrawToolbar();
-    void DrawBreadcrumbs();
-    void DrawFolderTree();
-    void DrawContentArea();
-    void DrawGridView();
-    void DrawListView();
-    void DrawColumnView();
-    void DrawAssetContextMenu();
-    void DrawBackgroundContextMenu();
-    void ApplyFilters();
-    void SortEntries();
-    void HandleKeyboardShortcuts();
-    void HandleDragDrop();
-    uint32_t LoadThumbnail(const FAssetEntry& entry);
 };
 
 //=============================================================================
