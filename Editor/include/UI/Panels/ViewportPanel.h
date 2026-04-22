@@ -309,229 +309,62 @@ public:
     // Lifecycle
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Initializes the viewport panel
-     */
-    void Initialize();
-    
-    /**
-     * @brief Shuts down the panel
-     */
-    void Shutdown();
+    void Initialize() {}
+    void Shutdown() {}
     
     //-------------------------------------------------------------------------
     // Rendering
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Main render function called every frame
-     * @param sceneTextureID Rendered scene texture
-     * @param viewportSize Viewport dimensions
-     */
     void OnUIRender(uint32_t sceneTextureID, const ImVec2& viewportSize);
     
     //-------------------------------------------------------------------------
-    // Camera Control
+    // Camera / Gizmo / Render / Snap / Stats / Play / Pick (all inline stubs)
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Gets the viewport camera
-     * @return Reference to camera struct
-     */
-    FViewportCamera& GetCamera();
-    
-    /**
-     * @brief Sets the camera mode
-     * @param mode Perspective/Ortho/Axis view
-     */
-    void SetCameraMode(ECameraMode mode);
-    
-    /**
-     * @brief Focuses camera on a position
-     * @param x World X
-     * @param y World Y
-     * @param z World Z
-     * @param distance Distance from target
-     */
-    void FocusOnPoint(float x, float y, float z, float distance = 10.0f);
-    
-    /**
-     * @brief Focuses on selected objects
-     */
-    void FocusOnSelection();
-    
-    /**
-     * @brief Resets camera to default position
-     */
-    void ResetCamera();
-    
-    //-------------------------------------------------------------------------
-    // Gizmo Control
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Sets the gizmo mode
-     * @param mode Translate/Rotate/Scale
-     */
-    void SetGizmoMode(EGizmoMode mode);
-    
-    /**
-     * @brief Sets the gizmo coordinate space
-     * @param space Local/World
-     */
-    void SetGizmoSpace(EGizmoSpace space);
-    
-    /**
-     * @brief Toggles gizmo visibility
-     * @param visible Show gizmo
-     */
-    void SetGizmoVisible(bool visible);
-    
-    /**
-     * @brief Checks if gizmo is being manipulated
-     * @return true if user is interacting with gizmo
-     */
-    bool IsGizmoInUse() const;
-    
-    //-------------------------------------------------------------------------
-    // Render Settings
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Sets the render mode
-     * @param mode Visualization mode
-     */
-    void SetRenderMode(ERenderMode mode);
-    
-    /**
-     * @brief Gets the current render mode
-     * @return Active render mode
-     */
-    ERenderMode GetRenderMode() const;
-    
-    /**
-     * @brief Sets show flags
-     * @param flags Display option flags
-     */
-    void SetShowFlags(EShowFlag flags);
-    
-    /**
-     * @brief Gets show flags
-     * @return Current show flags
-     */
-    EShowFlag GetShowFlags() const;
-    
-    /**
-     * @brief Toggles a show flag
-     * @param flag Flag to toggle
-     */
-    void ToggleShowFlag(EShowFlag flag);
-    
-    //-------------------------------------------------------------------------
-    // Snapping
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Enables/disables snapping
-     * @param enabled Snap state
-     */
-    void SetSnappingEnabled(bool enabled);
-    
-    /**
-     * @brief Sets snap values
-     * @param translate Position snap increment
-     * @param rotate Rotation snap in degrees
-     * @param scale Scale snap increment
-     */
-    void SetSnapValues(float translate, float rotate, float scale);
-    
-    //-------------------------------------------------------------------------
-    // Statistics
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Gets render statistics
-     * @return Reference to stats struct
-     */
-    const FRenderStats& GetRenderStats() const;
-    
-    /**
-     * @brief Shows/hides stats overlay
-     * @param show Display stats
-     */
-    void SetShowStats(bool show);
-    
-    //-------------------------------------------------------------------------
-    // Play Mode
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Enters play-in-editor mode
-     */
-    void BeginPlay();
-    
-    /**
-     * @brief Exits play-in-editor mode
-     */
-    void EndPlay();
-    
-    /**
-     * @brief Pauses/resumes play mode
-     * @param paused Pause state
-     */
-    void SetPaused(bool paused);
-    
-    /**
-     * @brief Checks if in play mode
-     * @return Play state
-     */
-    bool IsPlaying() const;
-    
-    //-------------------------------------------------------------------------
-    // Picking
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Performs mouse pick in viewport
-     * @param screenX Mouse X in viewport
-     * @param screenY Mouse Y in viewport
-     * @return Hit object ID (0 if none)
-     */
-    uint64_t Pick(float screenX, float screenY);
-    
-    /**
-     * @brief Gets the world ray from screen position
-     * @param screenX Mouse X
-     * @param screenY Mouse Y
-     * @param outOrigin Ray origin
-     * @param outDirection Ray direction
-     */
-    void ScreenToWorldRay(float screenX, float screenY,
-                          float* outOrigin, float* outDirection);
-    
-    //-------------------------------------------------------------------------
-    // Configuration
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Gets the viewport state
-     * @return Reference to state struct
-     */
-    FViewportState& GetState();
+    FViewportCamera& GetCamera() { return m_Camera; }
+    void SetCameraMode(ECameraMode mode) { m_Camera.Mode = mode; }
+    void FocusOnPoint(float x, float y, float z, float /*distance*/ = 10.0f) {
+        m_Camera.Position[0] = x; m_Camera.Position[1] = y; m_Camera.Position[2] = z;
+    }
+    void FocusOnSelection() {}
+    void ResetCamera() { m_Camera = FViewportCamera(); }
+    void SetGizmoMode(EGizmoMode mode) { m_State.GizmoMode = mode; }
+    void SetGizmoSpace(EGizmoSpace space) { m_State.GizmoSpace = space; }
+    void SetGizmoVisible(bool visible) { m_State.bShowGizmo = visible; }
+    bool IsGizmoInUse() const { return m_State.bDraggingGizmo; }
+    void SetRenderMode(ERenderMode mode) { m_State.RenderMode = mode; }
+    ERenderMode GetRenderMode() const { return m_State.RenderMode; }
+    void SetShowFlags(EShowFlag flags) { m_State.ShowFlags = flags; }
+    EShowFlag GetShowFlags() const { return m_State.ShowFlags; }
+    void ToggleShowFlag(EShowFlag flag) {
+        uint32_t cur = static_cast<uint32_t>(m_State.ShowFlags);
+        uint32_t f   = static_cast<uint32_t>(flag);
+        m_State.ShowFlags = static_cast<EShowFlag>(cur ^ f);
+    }
+    void SetSnappingEnabled(bool enabled) { m_State.bSnapEnabled = enabled; }
+    void SetSnapValues(float t, float r, float s) { m_State.SnapTranslate = t; m_State.SnapRotate = r; m_State.SnapScale = s; }
+    const FRenderStats& GetRenderStats() const { return m_Stats; }
+    void SetShowStats(bool show) { m_State.bShowStats = show; }
+    void BeginPlay() { m_State.bIsPlaying = true; }
+    void EndPlay() { m_State.bIsPlaying = false; }
+    void SetPaused(bool /*paused*/) {}
+    bool IsPlaying() const { return m_State.bIsPlaying; }
+    uint64_t Pick(float /*screenX*/, float /*screenY*/) { return 0; }
+    void ScreenToWorldRay(float /*sx*/, float /*sy*/, float* /*org*/, float* /*dir*/) {}
+    FViewportState& GetState() { return m_State; }
     
     //-------------------------------------------------------------------------
     // Callbacks
     //-------------------------------------------------------------------------
     
-    /** Called when an object is selected via picking */
     using SelectionCallback = std::function<void(uint64_t objectID)>;
-    
-    /** Called when transform gizmo modifies an object */
     using TransformCallback = std::function<void(uint64_t objectID, const float* matrix)>;
     
-    void SetOnObjectSelected(SelectionCallback callback);
-    void SetOnObjectTransformed(TransformCallback callback);
-    
+    void SetOnObjectSelected(SelectionCallback callback) { m_OnObjectSelected = callback; }
+    void SetOnObjectTransformed(TransformCallback callback) { m_OnObjectTransformed = callback; }
+
+
 private:
     //-------------------------------------------------------------------------
     // Internal State
@@ -542,43 +375,22 @@ private:
     FViewportState              m_State;
     FRenderStats                m_Stats;
     
-    float                       m_ViewportWidth;
-    float                       m_ViewportHeight;
-    float                       m_ViewMatrix[16];
-    float                       m_ProjectionMatrix[16];
+    float                       m_ViewportWidth = 1280.0f;
+    float                       m_ViewportHeight = 720.0f;
+    float                       m_ViewMatrix[16] = {};
+    float                       m_ProjectionMatrix[16] = {};
     
-    bool                        m_bIsFocused;
-    bool                        m_bIsHovered;
-    bool                        m_bRightMouseDown;
-    bool                        m_bMiddleMouseDown;
-    float                       m_LastMouseX;
-    float                       m_LastMouseY;
+    bool                        m_bIsFocused = false;
+    bool                        m_bIsHovered = false;
+    bool                        m_bRightMouseDown = false;
+    bool                        m_bMiddleMouseDown = false;
+    float                       m_LastMouseX = 0.0f;
+    float                       m_LastMouseY = 0.0f;
     
-    uint64_t                    m_SelectedObjectID;
+    uint64_t                    m_SelectedObjectID = 0;
     
     SelectionCallback           m_OnObjectSelected;
     TransformCallback           m_OnObjectTransformed;
-    
-    //-------------------------------------------------------------------------
-    // Internal Methods
-    //-------------------------------------------------------------------------
-    
-    void DrawToolbar();
-    void DrawGizmoModeButtons();
-    void DrawRenderModeDropdown();
-    void DrawShowFlagsMenu();
-    void DrawCameraModeMenu();
-    void DrawSnapSettings();
-    void DrawStatsOverlay();
-    void DrawOrientationGizmo(const ImVec2& position, float size);
-    void DrawPlayControls();
-    
-    void HandleCameraInput();
-    void HandleMousePicking(const ImVec2& mousePos);
-    void HandleKeyboardShortcuts();
-    void UpdateGizmo();
-    void UpdateMatrices();
-    void UpdateStats();
 };
 
 //=============================================================================
