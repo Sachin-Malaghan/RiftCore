@@ -123,6 +123,9 @@ static const char* GetGizmoModeName(EGizmoMode mode);
  * └─────────────────────────────────────────────────────────────┘
  */
 void ViewportPanel::OnUIRender(uint32_t sceneTextureID, const ImVec2& viewportSize) {
+    // Guard: ImGui context may be null if called across DLL boundaries before HUD sets it
+    if (!ImGui::GetCurrentContext()) return;
+
     // No padding for viewport to maximize scene area
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     
@@ -213,11 +216,10 @@ void ViewportPanel::OnUIRender(uint32_t sceneTextureID, const ImVec2& viewportSi
     }
     
     // === Transform Gizmo ===
-    ImGuizmo::SetOrthographic(s_State.Camera.Mode != ECameraMode::Perspective);
-    ImGuizmo::SetDrawlist(drawList);
-    ImGuizmo::SetRect(imageMin.x, imageMin.y, s_State.ViewportSize.x, s_State.ViewportSize.y);
-    
-    // Draw transform gizmo for selected object
+    // TODO: Enable once ImGuizmo is fully integrated
+    // ImGuizmo::SetOrthographic(...);
+    // ImGuizmo::SetDrawlist(drawList);
+    // ImGuizmo::SetRect(...);
     HandleGizmoInteraction();
     
     // Context menu on right-click (when not camera controlling)
@@ -741,7 +743,8 @@ static void HandleGizmoInteraction() {
     //     s_State.bDraggingGizmo = false;
     // }
     
-    s_State.bDraggingGizmo = ImGuizmo::IsUsing();
+    // TODO: s_State.bDraggingGizmo = ImGuizmo::IsUsing(); // re-enable when gizmo is integrated
+    s_State.bDraggingGizmo = false;
 }
 
 /**
