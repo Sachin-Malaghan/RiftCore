@@ -23,6 +23,10 @@
 
 namespace RiftCore::UI {
 
+// Import CommandBuffer from parent namespace
+using RiftCore::CommandBuffer;
+using RiftCore::EditorCommandType;
+
 //=============================================================================
 // ENUMERATIONS
 //=============================================================================
@@ -142,7 +146,7 @@ struct FInspectorState {
     char            SearchBuffer[256];  ///< Search input buffer
     SceneNodeID     LockedNodeID;       ///< Locked node ID when selection locked
     float           LabelWidth;         ///< Label column width
-    std::unordered_map<uint64_t, bool> ComponentExpanded; ///< Component expanded states
+    std::unordered_map<std::string, bool> ComponentExpanded; ///< Component expanded states (by name)
     
     FInspectorState()
         : bLocked(false), bLockSelection(false), bShowAdvanced(false),
