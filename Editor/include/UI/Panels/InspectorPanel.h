@@ -203,88 +203,11 @@ public:
     void OnUIRender(ISceneNode* selectedNode, CommandBuffer& cb);
     
     //-------------------------------------------------------------------------
-    // Selection
+    // Selection / Component Operations / Configuration (inline stubs below)
     //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Sets the inspected node
-     * @param node Node to inspect (nullptr to clear)
-     */
-    void SetInspectedNode(ISceneNode* node);
-    
-    /**
-     * @brief Gets the currently inspected node
-     * @return Inspected node pointer
-     */
-    ISceneNode* GetInspectedNode() const;
-    
-    /**
-     * @brief Locks/unlocks the inspector to current selection
-     * @param locked Lock state
-     */
-    void SetLocked(bool locked);
-    
-    /**
-     * @brief Checks if inspector is locked
-     * @return Lock state
-     */
-    bool IsLocked() const;
-    
-    //-------------------------------------------------------------------------
-    // Component Operations
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Adds a component to the selected node
-     * @param type Component type to add
-     */
-    void AddComponent(EComponentType type);
-    
-    /**
-     * @brief Removes a component from the selected node
-     * @param componentID Component instance ID
-     */
-    void RemoveComponent(uint64_t componentID);
-    
-    /**
-     * @brief Copies a component's values
-     * @param componentID Component to copy
-     */
-    void CopyComponent(uint64_t componentID);
-    
-    /**
-     * @brief Pastes copied component values
-     * @param componentID Target component
-     */
-    void PasteComponent(uint64_t componentID);
-    
-    /**
-     * @brief Resets a component to default values
-     * @param componentID Component to reset
-     */
-    void ResetComponent(uint64_t componentID);
-    
-    //-------------------------------------------------------------------------
-    // Configuration
-    //-------------------------------------------------------------------------
-    
-    /**
-     * @brief Gets the inspector state
-     * @return Reference to state struct
-     */
-    FInspectorState& GetState();
-    
-    /**
-     * @brief Sets whether to show advanced properties
-     * @param show Show advanced
-     */
-    void SetShowAdvanced(bool show);
-    
-    /**
-     * @brief Sets the property search filter
-     * @param filter Search string
-     */
-    void SetSearchFilter(const std::string& filter);
+
+    void SetShowAdvanced(bool show) { m_State.bShowAdvanced = show; }
+    void SetSearchFilter(const std::string& filter) { m_State.SearchFilter = filter; }
     
     //-------------------------------------------------------------------------
     // Custom Property Drawers
@@ -293,18 +216,12 @@ public:
     /** Custom property drawer function type */
     using PropertyDrawer = std::function<bool(const FPropertyMetadata&, void* value)>;
     
-    /**
-     * @brief Registers a custom property drawer
-     * @param typeName Property type name
-     * @param drawer Drawer function
-     */
-    void RegisterPropertyDrawer(const std::string& typeName, PropertyDrawer drawer);
-    
-    /**
-     * @brief Unregisters a custom property drawer
-     * @param typeName Property type name
-     */
-    void UnregisterPropertyDrawer(const std::string& typeName);
+    void RegisterPropertyDrawer(const std::string& typeName, PropertyDrawer drawer) {
+        m_CustomDrawers[typeName] = drawer;
+    }
+    void UnregisterPropertyDrawer(const std::string& typeName) {
+        m_CustomDrawers.erase(typeName);
+    }
     
     //-------------------------------------------------------------------------
     // Callbacks
@@ -313,76 +230,42 @@ public:
     /** Callback when a property is modified */
     using PropertyChangedCallback = std::function<void(const std::string& propertyPath, const std::any& newValue)>;
     
-    void SetOnPropertyChanged(PropertyChangedCallback callback);
+    void SetOnPropertyChanged(PropertyChangedCallback callback) { m_OnPropertyChanged = callback; }
     
+    // Stub implementations for methods not yet implemented in .cpp
+    void Initialize() {}
+    void Shutdown() {}
+    void SetInspectedNode(ISceneNode* node) { m_InspectedNode = node; }
+    ISceneNode* GetInspectedNode() const { return m_InspectedNode; }
+    void SetLocked(bool locked) { m_State.bLocked = locked; }
+    bool IsLocked() const { return m_State.bLocked; }
+    void AddComponent(EComponentType /*type*/) {}
+    void RemoveComponent(uint64_t /*componentID*/) {}
+    void CopyComponent(uint64_t /*componentID*/) {}
+    void PasteComponent(uint64_t /*componentID*/) {}
+    void ResetComponent(uint64_t /*componentID*/) {}
+    FInspectorState& GetState() { return m_State; }
+
 private:
     //-------------------------------------------------------------------------
     // Internal State
     //-------------------------------------------------------------------------
     
-    ISceneNode*                 m_InspectedNode;
-    CommandBuffer*              m_CommandBuffer;
+    ISceneNode*                 m_InspectedNode = nullptr;
+    CommandBuffer*              m_CommandBuffer = nullptr;
     
     std::vector<FComponentInfo> m_Components;
     FInspectorState             m_State;
-    char                        m_SearchBuffer[256];
+    char                        m_SearchBuffer[256] = {};
     
     std::unordered_map<std::string, PropertyDrawer> m_CustomDrawers;
     std::any                    m_CopiedComponentData;
-    EComponentType              m_CopiedComponentType;
+    EComponentType              m_CopiedComponentType = EComponentType::Custom;
     
     PropertyChangedCallback     m_OnPropertyChanged;
     
-    //-------------------------------------------------------------------------
-    // Component Drawing
-    //-------------------------------------------------------------------------
-    
-    void DrawToolbar(ISceneNode* node);
-    void DrawNodeHeader(ISceneNode* node);
-    void DrawComponents();
-    void DrawComponentSection(FComponentInfo& component);
-    void DrawAddComponentButton(ISceneNode* node, CommandBuffer& cb);
-    void DrawAddComponentMenu();
+    // Internal methods with real implementations in .cpp
     void DrawNoSelectionPlaceholder();
-    
-    //-------------------------------------------------------------------------
-    // Built-in Component Drawers
-    //-------------------------------------------------------------------------
-    
-    void DrawTransform(ISceneNode* node);
-    void DrawMesh(ISceneNode* node);
-    void DrawMaterial(ISceneNode* node);
-    void DrawLight(ISceneNode* node);
-    void DrawCamera(ISceneNode* node);
-    void DrawPhysics(ISceneNode* node);
-    void DrawCollider(ISceneNode* node);
-    void DrawAudio(ISceneNode* node);
-    void DrawScript(ISceneNode* node);
-    
-    //-------------------------------------------------------------------------
-    // Property Widgets
-    //-------------------------------------------------------------------------
-    
-    bool DrawProperty(const FPropertyMetadata& meta, void* value);
-    bool DrawBoolProperty(const FPropertyMetadata& meta, bool* value);
-    bool DrawIntProperty(const FPropertyMetadata& meta, int* value);
-    bool DrawFloatProperty(const FPropertyMetadata& meta, float* value);
-    bool DrawStringProperty(const FPropertyMetadata& meta, std::string* value);
-    bool DrawVector2Property(const FPropertyMetadata& meta, float* value);
-    bool DrawVector3Property(const FPropertyMetadata& meta, float* value);
-    bool DrawVector4Property(const FPropertyMetadata& meta, float* value);
-    bool DrawColorProperty(const FPropertyMetadata& meta, float* value, bool alpha);
-    bool DrawEnumProperty(const FPropertyMetadata& meta, int* value);
-    bool DrawAssetProperty(const FPropertyMetadata& meta, uint64_t* assetID);
-    
-    //-------------------------------------------------------------------------
-    // Utility
-    //-------------------------------------------------------------------------
-    
-    void RefreshComponents();
-    void ApplyFilter();
-    void HandleKeyboardShortcuts();
-    bool MatchesFilter(const std::string& name);
 };
 
 //=============================================================================
