@@ -476,11 +476,11 @@ void HUD::SetupDockspace() {
     ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Down, 0.30f, &dockBottom, &dockCenter);
     
     // Dock default windows
-    ImGui::DockBuilderDockWindow("Hierarchy", dockLeft);
+    ImGui::DockBuilderDockWindow("Scene Hierarchy", dockLeft);
     ImGui::DockBuilderDockWindow("Viewport", dockCenter);
-    ImGui::DockBuilderDockWindow("Inspector", dockRight);
+    ImGui::DockBuilderDockWindow("Details", dockRight);
     ImGui::DockBuilderDockWindow("Console", dockBottom);
-    ImGui::DockBuilderDockWindow("Asset Browser", dockBottom);
+    ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
     ImGui::DockBuilderDockWindow("Visual Scripting", dockBottom);
     
     ImGui::DockBuilderFinish(dockspaceID);
