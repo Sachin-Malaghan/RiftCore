@@ -21,13 +21,12 @@
 #include <unordered_map>
 #include <algorithm>
 
-// Forward declarations - these are defined in RiftCore namespace in HUD.h
-namespace RiftCore {
-    class CommandBuffer;
-    enum class EditorCommandType : uint8_t;
-}
-
 namespace RiftCore::UI {
+
+// Bring CommandBuffer into UI namespace for convenience
+using ::RiftCore::CommandBuffer;
+using ::RiftCore::EditorCommandType;
+using ::RiftCore::EditorCommand;
 
 //=============================================================================
 // ENUMERATIONS
@@ -201,7 +200,7 @@ public:
      * @param selectedNode Currently selected scene node
      * @param cb Command buffer for undo/redo
      */
-    void OnUIRender(ISceneNode* selectedNode, RiftCore::CommandBuffer& cb);
+    void OnUIRender(ISceneNode* selectedNode, CommandBuffer& cb);
     
     //-------------------------------------------------------------------------
     // Selection
@@ -322,7 +321,7 @@ private:
     //-------------------------------------------------------------------------
     
     ISceneNode*                 m_InspectedNode;
-    RiftCore::CommandBuffer*    m_CommandBuffer;
+    CommandBuffer*              m_CommandBuffer;
     
     std::vector<FComponentInfo> m_Components;
     FInspectorState             m_State;
@@ -342,7 +341,7 @@ private:
     void DrawNodeHeader(ISceneNode* node);
     void DrawComponents();
     void DrawComponentSection(FComponentInfo& component);
-    void DrawAddComponentButton(ISceneNode* node, RiftCore::CommandBuffer& cb);
+    void DrawAddComponentButton(ISceneNode* node, CommandBuffer& cb);
     void DrawAddComponentMenu();
     void DrawNoSelectionPlaceholder();
     
