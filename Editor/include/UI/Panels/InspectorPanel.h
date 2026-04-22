@@ -181,15 +181,8 @@ public:
     // Lifecycle
     //-------------------------------------------------------------------------
     
-    /**
-     * @brief Initializes the inspector panel
-     */
-    void Initialize();
-    
-    /**
-     * @brief Shuts down the panel
-     */
-    void Shutdown();
+    void Initialize() {}
+    void Shutdown() {}
     
     //-------------------------------------------------------------------------
     // Rendering
@@ -233,8 +226,6 @@ public:
     void SetOnPropertyChanged(PropertyChangedCallback callback) { m_OnPropertyChanged = callback; }
     
     // Stub implementations for methods not yet implemented in .cpp
-    void Initialize() {}
-    void Shutdown() {}
     void SetInspectedNode(ISceneNode* node) { m_InspectedNode = node; }
     ISceneNode* GetInspectedNode() const { return m_InspectedNode; }
     void SetLocked(bool locked) { m_State.bLocked = locked; }
