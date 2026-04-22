@@ -21,13 +21,12 @@
 #include <functional>
 #include <cstdint>
 
-// Forward declarations - these are defined in RiftCore namespace in HUD.h
-namespace RiftCore {
-    class CommandBuffer;
-    enum class EditorCommandType : uint8_t;
-}
-
 namespace RiftCore::UI {
+
+// Bring CommandBuffer into UI namespace for convenience
+using ::RiftCore::CommandBuffer;
+using ::RiftCore::EditorCommandType;
+using ::RiftCore::EditorCommand;
 
 //=============================================================================
 // ENUMERATIONS
@@ -222,7 +221,7 @@ public:
      * @param scene Pointer to the scene system
      * @param cb Command buffer for undo/redo operations
      */
-    void OnUIRender(ISceneSystem* scene, RiftCore::CommandBuffer& cb);
+    void OnUIRender(ISceneSystem* scene, CommandBuffer& cb);
     
     //-------------------------------------------------------------------------
     // Selection
@@ -385,7 +384,7 @@ private:
     //-------------------------------------------------------------------------
     
     ISceneSystem*               m_Scene;
-    RiftCore::CommandBuffer*    m_CommandBuffer;
+    CommandBuffer*              m_CommandBuffer;
     
     std::vector<FHierarchyNode> m_Nodes;
     std::vector<SceneNodeID>    m_SelectedNodes;
