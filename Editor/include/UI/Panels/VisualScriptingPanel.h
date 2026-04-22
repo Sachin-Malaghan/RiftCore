@@ -529,12 +529,15 @@ public:
     void SetOnCompile(CompileCallback callback);
     void SetOnNodeSelected(NodeSelectedCallback callback);
     
+public:
+    // Made public so static helper functions can access it
+    static ed::EditorContext*   m_EditorContext;
+    
 private:
     //-------------------------------------------------------------------------
     // Internal State
     //-------------------------------------------------------------------------
     
-    static ed::EditorContext*   m_EditorContext;
     FScriptGraph                m_Graph;
     FVisualScriptState          m_State;
     std::vector<FNodeTemplate>  m_NodeTemplates;
