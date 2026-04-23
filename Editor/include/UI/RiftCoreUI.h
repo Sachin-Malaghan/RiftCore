@@ -1,44 +1,40 @@
 #pragma once
-#include <UI/Styling/ImGuiTheme.h>
-#include <UI/Commands/CommandBuffer.h>
-#include <memory>
-#include <map>
-#include <string>
+/**
+ * @file RiftCoreUI.h
+ * @brief DEPRECATED - Use <Renderer/HUD.h> instead
+ * 
+ * This header is kept for backward compatibility only.
+ * All functionality has been consolidated into the HUD class.
+ * 
+ * @deprecated Use HUD class from <Renderer/HUD.h>
+ * @see HUD
+ */
 
-struct GLFWwindow;
+//#include <Renderer/HUD.h>
 
+// Compatibility alias - RiftCoreUI is now just an alias for HUD
 namespace RiftCore::UI {
-    class RiftCoreUI {
-    public:
-        RiftCoreUI();
-        ~RiftCoreUI();
-
-        bool Initialize(GLFWwindow* window);
-        void Shutdown();
-
-        void BeginFrame();
-        void EndFrame();
-
-        void OnUIRender();
-
-        CommandBuffer& GetCommandBuffer() { return m_CommandBuffer; }
-
-    private:
-        void RenderMainDockspace();
-        void RenderTopToolbar();
-        void RenderMenuBar();
-
-        GLFWwindow* m_Window = nullptr;
-        CommandBuffer m_CommandBuffer;
-        bool m_EditorOpen = true;
-
-        bool m_ShowStatsWindow = true;
-        bool m_ShowAssetBrowser = true;
-        bool m_ShowLogWindow = false;
-
-    private:
-        // Use unsigned int instead of GLuint to avoid header errors
-        std::map<std::string, unsigned int> m_IconCache;
-        unsigned int LoadTexture(const std::string& path);
-    };
+    
+    /**
+     * @class RiftCoreUI
+     * @deprecated Use RiftCore::HUD instead
+     * 
+     * This class is deprecated. The HUD class from <Renderer/HUD.h>
+     * provides all the same functionality with additional features:
+     * - Docking support
+     * - Menu bar and toolbar
+     * - CommandBuffer for action dispatch
+     * - Panel visibility management
+     * - Icon loading system
+     */
+    //using RiftCoreUI = ::RiftCore::HUD;
+    
+    // Re-export types that were previously in this namespace
+    //using HUDConfig = ::RiftCore::HUDConfig;
+    //using HUDCallbacks = ::RiftCore::HUDCallbacks;
+    
+    // Re-export CommandBuffer types for convenience
+    //using CommandBuffer = ::RiftCore::CommandBuffer;
+    //using EditorCommandType = ::RiftCore::EditorCommandType;
+    //using EditorCommand = ::RiftCore::EditorCommand;
 }
