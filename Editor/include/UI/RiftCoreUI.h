@@ -10,7 +10,7 @@
  * @see HUD
  */
 
-#include <Renderer/HUD.h>
+//#include <Renderer/HUD.h>
 
 // Compatibility alias - RiftCoreUI is now just an alias for HUD
 namespace RiftCore::UI {
@@ -27,14 +27,14 @@ namespace RiftCore::UI {
      * - Panel visibility management
      * - Icon loading system
      */
-    using RiftCoreUI = ::RiftCore::HUD;
+    //using RiftCoreUI = ::RiftCore::HUD;
     
     // Re-export types that were previously in this namespace
-    using HUDConfig = ::RiftCore::HUDConfig;
-    using HUDCallbacks = ::RiftCore::HUDCallbacks;
+    //using HUDConfig = ::RiftCore::HUDConfig;
+    //using HUDCallbacks = ::RiftCore::HUDCallbacks;
     
     // Re-export CommandBuffer types for convenience
-    using CommandBuffer = ::RiftCore::CommandBuffer;
-    using EditorCommandType = ::RiftCore::EditorCommandType;
-    using EditorCommand = ::RiftCore::EditorCommand;
+    //using CommandBuffer = ::RiftCore::CommandBuffer;
+    //using EditorCommandType = ::RiftCore::EditorCommandType;
+    //using EditorCommand = ::RiftCore::EditorCommand;
 }
