@@ -1,10 +1,10 @@
-﻿add_library(RiftCore_Renderer SHARED
+add_library(RiftCore_Renderer SHARED
     src/Camera.cpp
     src/MeshFactory.cpp
     src/RenderSystem.cpp
     src/TextureLoader.cpp
     src/OBJLoader.cpp
-    src/HUD.cpp
+    # HUD.cpp is removed from here
 )
 
 target_compile_features(RiftCore_Renderer
@@ -33,13 +33,13 @@ target_compile_definitions(RiftCore_Renderer
 find_package(glfw3  CONFIG REQUIRED)
 find_package(glad   CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(imgui  CONFIG REQUIRED)
+# ImGui find_package is removed from here
 
 target_link_libraries(RiftCore_Renderer
     PRIVATE glfw
     PRIVATE glad::glad
     PRIVATE OpenGL::GL
-    PRIVATE imgui::imgui
+    # ImGui linking is removed from here
 )
 
 set_target_properties(RiftCore_Renderer PROPERTIES
