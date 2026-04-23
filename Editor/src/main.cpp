@@ -1,4 +1,4 @@
-﻿#define NOMINMAX
+#define NOMINMAX
 #include <Core/Engine.h>
 #include <Core/Logger.h>
 #include <Core/PluginManager.h>
@@ -12,8 +12,10 @@
 #include <Scene/SceneSystem.h>
 #include <Scene/SceneNode.h>
 
-// New Modular UI Includes
-#include <UI/RiftCoreUI.h>
+// HUD is now part of the Editor UI
+#include <UI/HUD.h>
+
+// Panel Includes
 #include <UI/Panels/ViewportPanel.h>
 #include <UI/Panels/HierarchyPanel.h>
 #include <UI/Panels/InspectorPanel.h>
@@ -21,6 +23,7 @@
 #include <UI/Panels/VisualScriptingPanel.h>
 #include <UI/Panels/ConsolePanel.h>
 
+#include <ImGuizmo.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -46,54 +49,78 @@ int main()
 
     // ── Load modules ──────────────────────────────────────
     logger->Info("Editor", "Loading modules...");
-    plugins->LoadAndInit("OpenGLBackend",
-        "RiftCore_OpenGLBackend.dll", params);
+    plugins->LoadAndInit("OpenGLBackend", "RiftCore_OpenGLBackend.dll", params);
     auto* rhi = engine.GetContext()->RHI();
     auto  devRes = rhi->CreateDevice(nullptr);
     if (devRes.IsErr()) return -1;
     auto* device = static_cast<GLDevice*>(devRes.Value());
 
-    plugins->LoadAndInit("Input",
-        "RiftCore_Input.dll", params);
-    auto* inputMod = plugins->GetModuleAs
-        <InputModule>("Input");
-    InputSystem* input =
-        inputMod ? inputMod->GetInputSystem() : nullptr;
+    plugins->LoadAndInit("Input", "RiftCore_Input.dll", params);
+    auto* inputMod = plugins->GetModuleAs<InputModule>("Input");
+    InputSystem* input = inputMod ? inputMod->GetInputSystem() : nullptr;
 
-    plugins->LoadAndInit("Renderer",
-        "RiftCore_Renderer.dll", params);
-    auto* rendMod = plugins->GetModuleAs
-        <RendererModule>("Renderer");
+    plugins->LoadAndInit("Renderer", "RiftCore_Renderer.dll", params);
+    auto* rendMod = plugins->GetModuleAs<RendererModule>("Renderer");
     auto* renderer = rendMod->GetRenderSystem();
-    if (renderer->Initialize(device, 1280, 720).IsErr())
-        return -1;
+    if (renderer->Initialize(device, 1280, 720).IsErr()) return -1;
     auto* texLoader = renderer->GetTextureLoader();
 
-    plugins->LoadAndInit("Physics",
-        "RiftCore_Physics.dll", params);
-    auto* physMod = plugins->GetModuleAs
-        <PhysicsModule>("Physics");
+    plugins->LoadAndInit("Physics", "RiftCore_Physics.dll", params);
+    auto* physMod = plugins->GetModuleAs<PhysicsModule>("Physics");
     auto* physics = physMod->GetPhysics();
 
-    plugins->LoadAndInit("Scene",
-        "RiftCore_Scene.dll", params);
-    auto* sceneMod = plugins->GetModuleAs
-        <SceneModule>("Scene");
+    plugins->LoadAndInit("Scene", "RiftCore_Scene.dll", params);
+    auto* sceneMod = plugins->GetModuleAs<SceneModule>("Scene");
     auto* scene = sceneMod->GetSceneSystem();
 
-    plugins->LoadAndInit("Scripting",
-        "RiftCore_Scripting.dll", params);
+    plugins->LoadAndInit("Scripting", "RiftCore_Scripting.dll", params);
     IScripting* scriptMod = plugins->GetModuleAs<IScripting>("Scripting");
 
     logger->Info("Editor", "All modules loaded successfully");
 
-    // ── Initialize UI ────────────────────────────────────
-    logger->Info("Editor", "Initializing UI...");
-    UI::RiftCoreUI riftUI;
-    if (!riftUI.Initialize(device->GetWindow())) {
-        logger->Error("Editor", "RIFT CORE UI init failed");
+    // ── Initialize HUD (Main UI System) ──────────────────
+    logger->Info("Editor", "Initializing HUD...");
+    HUD hud;
+    HUDConfig hudConfig;
+    hudConfig.EnableDocking = true;
+    hudConfig.EnableViewports = true;
+    hudConfig.DarkTheme = true;
+    hudConfig.IconsPath = "Assets/Icons/";
+
+    if (!hud.Initialize(device->GetWindow(), hudConfig)) {
+        logger->Error("Editor", "HUD initialization failed!");
         return -1;
     }
+
+    // Because HUD and Editor are now compiled together in the same EXE,
+    // we don't need any complex DLL boundary syncs! 
+    // Just sync ImGuizmo to the local context.
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+
+    // Set up HUD callbacks for engine interaction
+    std::string scenePath; 
+    HUDCallbacks callbacks;
+    callbacks.OnNewScene = [&]() {
+        scene->NewScene("NewScene");
+        logger->Info("Editor", "Created new scene");
+    };
+    callbacks.OnOpenScene = [&]() {
+        auto result = scene->LoadScene(scenePath);
+        if (result.IsOk()) logger->Info("Editor", "Scene loaded");
+    };
+    callbacks.OnSaveScene = [&]() {
+        scene->SaveScene(scenePath);
+        logger->Info("Editor", "Scene saved");
+    };
+    callbacks.OnPlay = [&]() { logger->Info("Editor", "Play mode started"); };
+    callbacks.OnStop = [&]() { logger->Info("Editor", "Play mode stopped"); };
+    callbacks.OnExecuteCommand = [&](const std::string& cmd) {
+        if (scriptMod) scriptMod->ExecuteString(const_cast<char*>(cmd.c_str()));
+        logger->Info("Script", ("Executed: " + cmd).c_str());
+    };
+    hud.SetCallbacks(callbacks);
+
+    // Initialize Visual Scripting Panel
     UI::VisualScriptingPanel scriptPanel;
     scriptPanel.Initialize();
 
@@ -104,7 +131,7 @@ int main()
     UI::AssetBrowserPanel assetPanel;
     UI::ConsolePanel consolePanel;
 
-    logger->Info("Editor", "Modular RIFT CORE UI initialized");
+    logger->Info("Editor", "HUD and panels initialized");
 
     // ── Physics Setup ────────────────────────────────────
     logger->Info("Physics", "Creating ground plane...");
@@ -112,51 +139,36 @@ int main()
 
     // ── Load default scene ───────────────────────────────
     logger->Info("Scene", "Loading scene...");
-    std::string scenePath =
-        "..\\..\\..\\Assets\\Scenes\\TestLevel.json";
+    scenePath = "..\\..\\..\\Assets\\Scenes\\TestLevel.json";
     auto loadResult = scene->LoadScene(scenePath);
     if (loadResult.IsOk()) {
-        logger->Info("Scene",
-            "Loaded scene: TestLevel.json ("
-            + std::to_string(scene->GetNodeCount())
-            + " nodes)");
-    } else {
-        logger->Warning("Scene",
-            "Failed to load TestLevel.json, creating new scene");
+        logger->Info("Scene", "Loaded scene: TestLevel.json (" + std::to_string(scene->GetNodeCount()) + " nodes)");
+    }
+    else {
+        logger->Warning("Scene", "Failed to load TestLevel.json, creating new scene");
         scene->NewScene("NewScene");
-        logger->Info("Scene", "Starting with empty scene");
     }
 
     // ── Meshes for rendering ─────────────────────────────
     logger->Info("Renderer", "Loading meshes...");
-    auto* cubeMesh = renderer->UploadMesh(
-        MeshFactory::CreateCube(1.0f)).Value();
-    auto* planeMesh = renderer->UploadMesh(
-        MeshFactory::CreatePlane(30.0f, 10)).Value();
-    auto* sphereMesh = renderer->UploadMesh(
-        MeshFactory::CreateSphere(0.5f, 20, 20)).Value();
+    auto* cubeMesh = renderer->UploadMesh(MeshFactory::CreateCube(1.0f)).Value();
+    auto* planeMesh = renderer->UploadMesh(MeshFactory::CreatePlane(30.0f, 10)).Value();
+    auto* sphereMesh = renderer->UploadMesh(MeshFactory::CreateSphere(0.5f, 20, 20)).Value();
 
     // ── Textures ─────────────────────────────────────────
     logger->Info("Renderer", "Loading textures...");
-    u8 gA[4] = {90, 130, 90, 255}, gB[4] = {60, 90, 60, 255};
-    auto* groundTex = texLoader->CreateCheckerboard(
-        "ground", 256, 32, gA, gB).Value();
-    auto* redTex = texLoader->CreateSolidColor(
-        "red", 200, 80, 80).Value();
-    auto* blueTex = texLoader->CreateSolidColor(
-        "blue", 80, 100, 220).Value();
-    auto* goldTex = texLoader->CreateSolidColor(
-        "gold", 220, 180, 50).Value();
-    auto* grayTex = texLoader->CreateSolidColor(
-        "gray", 160, 160, 160).Value();
-    auto* greenTex = texLoader->CreateSolidColor(
-        "green", 80, 200, 80).Value();
+    u8 gA[4] = { 90, 130, 90, 255 }, gB[4] = { 60, 90, 60, 255 };
+    auto* groundTex = texLoader->CreateCheckerboard("ground", 256, 32, gA, gB).Value();
+    auto* redTex = texLoader->CreateSolidColor("red", 200, 80, 80).Value();
+    auto* blueTex = texLoader->CreateSolidColor("blue", 80, 100, 220).Value();
+    auto* goldTex = texLoader->CreateSolidColor("gold", 220, 180, 50).Value();
+    auto* grayTex = texLoader->CreateSolidColor("gray", 160, 160, 160).Value();
+    auto* greenTex = texLoader->CreateSolidColor("green", 80, 200, 80).Value();
     auto* checker = texLoader->GetCheckerTexture();
 
-    auto makeMat = [](Texture2D* tex,
-                      f32 met = 0.0f, f32 rou = 0.5f) {
+    auto makeMat = [](Texture2D* tex, f32 met = 0.0f, f32 rou = 0.5f) {
         MaterialData m;
-        m.albedo = {1, 1, 1};
+        m.albedo = { 1, 1, 1 };
         m.metallic = met;
         m.roughness = rou;
         m.albedoTex = tex;
@@ -169,7 +181,7 @@ int main()
 
     // ── Editor camera ────────────────────────────────────
     Camera camera;
-    camera.SetPosition({0, 8, 16});
+    camera.SetPosition({ 0, 8, 16 });
     camera.SetFOV(60.0f);
     camera.SetAspectRatio(1280.0f / 720.0f);
     camera.SetClipPlanes(0.1f, 500.0f);
@@ -180,16 +192,9 @@ int main()
 
     Light sun;
     sun.type = LightType::Directional;
-    sun.direction = {-0.5f, -1.0f, -0.5f};
-    sun.color = {1, 0.95f, 0.85f};
+    sun.direction = { -0.5f, -1.0f, -0.5f };
+    sun.color = { 1, 0.95f, 0.85f };
     sun.intensity = 1.8f;
-
-    logger->Info("Editor", "=================================");
-    logger->Info("Editor", "EDITOR CONTROLS:");
-    logger->Info("Editor", "  WASD+QE    = Move camera");
-    logger->Info("Editor", "  Arrows     = Rotate camera");
-    logger->Info("Editor", "  ESC        = Quit");
-    logger->Info("Editor", "=================================");
 
     u32 frameCount = 0;
     u64 totalFrames = 0;
@@ -210,7 +215,6 @@ int main()
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-    // Texture for rendering
     glGenTextures(1, &sceneTexture);
     glBindTexture(GL_TEXTURE_2D, sceneTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1280, 720, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -218,7 +222,6 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneTexture, 0);
 
-    // Depth/Stencil buffer
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1280, 720);
@@ -236,35 +239,22 @@ int main()
         device->BeginFrame();
         if (input) input->Update();
 
-        // ── Scripting / Automation Update ─────────────────
-        if (scriptMod) {
-            scriptMod->OnUpdate(dt);
-        }
-
-        // ── Physics & Scene Update ───────────────────────
+        if (scriptMod) scriptMod->OnUpdate(dt);
         physMod->OnUpdate(dt);
         sceneMod->OnUpdate(dt);
 
-        // ── UI Frame Start ───────────────────────────────
-        riftUI.BeginFrame();
+        hud.BeginFrame();
 
         // ── Editor Camera Input ──────────────────────────
         if (input) {
             if (input->IsKeyDown(Key::Escape)) break;
 
-            // Camera movement
-            if (input->IsKeyDown(Key::W))
-                camera.MoveForward(-camSpd * dt);
-            if (input->IsKeyDown(Key::S))
-                camera.MoveForward(camSpd * dt);
-            if (input->IsKeyDown(Key::A))
-                camera.MoveRight(-camSpd * dt);
-            if (input->IsKeyDown(Key::D))
-                camera.MoveRight(camSpd * dt);
-            if (input->IsKeyDown(Key::Q))
-                camera.MoveUp(-camSpd * dt);
-            if (input->IsKeyDown(Key::E))
-                camera.MoveUp(camSpd * dt);
+            if (input->IsKeyDown(Key::W)) camera.MoveForward(-camSpd * dt);
+            if (input->IsKeyDown(Key::S)) camera.MoveForward(camSpd * dt);
+            if (input->IsKeyDown(Key::A)) camera.MoveRight(-camSpd * dt);
+            if (input->IsKeyDown(Key::D)) camera.MoveRight(camSpd * dt);
+            if (input->IsKeyDown(Key::Q)) camera.MoveUp(-camSpd * dt);
+            if (input->IsKeyDown(Key::E)) camera.MoveUp(camSpd * dt);
             if (input->IsKeyDown(Key::Left)) {
                 camera.RotateYaw(-rotSpd * dt);
                 camYaw -= rotSpd * dt;
@@ -292,16 +282,14 @@ int main()
         renderer->BeginFrame(camera);
         renderer->SubmitLight(sun);
 
-        // Ground
         {
             DrawCall dc;
             dc.mesh = planeMesh;
             dc.material = groundMat;
-            dc.transform = Math::Translate({0, 0, 0});
+            dc.transform = Math::Translate({ 0, 0, 0 });
             renderer->Submit(dc);
         }
 
-        // Render all scene nodes
         scene->ForEachNode([&](ISceneNode* node) {
             if (!node->IsActive()) return;
 
@@ -310,57 +298,37 @@ int main()
             Vec3 scl = node->GetLocalScale();
 
             auto* sNode = static_cast<SceneNode*>(node);
-
-            // Choose mesh
             GPUMesh* mesh = cubeMesh;
             if (sNode->hasPhysics) {
-                auto& shape =
-                    sNode->physicsDesc.colliderShape;
-                if (shape == "sphere")
-                    mesh = sphereMesh;
-                else if (shape == "plane")
-                    mesh = planeMesh;
+                auto& shape = sNode->physicsDesc.colliderShape;
+                if (shape == "sphere") mesh = sphereMesh;
+                else if (shape == "plane") mesh = planeMesh;
             }
 
-            // Choose material/color
             MaterialData mat = makeMat(checker);
             if (sNode->hasMesh) {
                 Vec3 alb = sNode->meshDesc.albedo;
                 f32  met = sNode->meshDesc.metallic;
                 f32  rou = sNode->meshDesc.roughness;
-                if (alb.x > 0.6f && alb.y < 0.4f)
-                    mat = makeMat(redTex, met, rou);
-                else if (alb.z > 0.6f)
-                    mat = makeMat(blueTex, met, rou);
-                else if (alb.x > 0.6f && alb.y > 0.5f)
-                    mat = makeMat(goldTex, met, rou);
-                else if (alb.y > 0.5f && alb.x < 0.5f)
-                    mat = makeMat(greenTex, met, rou);
-                else
-                    mat = makeMat(grayTex, met, rou);
+                if (alb.x > 0.6f && alb.y < 0.4f) mat = makeMat(redTex, met, rou);
+                else if (alb.z > 0.6f) mat = makeMat(blueTex, met, rou);
+                else if (alb.x > 0.6f && alb.y > 0.5f) mat = makeMat(goldTex, met, rou);
+                else if (alb.y > 0.5f && alb.x < 0.5f) mat = makeMat(greenTex, met, rou);
+                else mat = makeMat(grayTex, met, rou);
             }
 
-            // Skip plane visual (ground is rendered separately)
-            if (sNode->hasPhysics &&
-                sNode->physicsDesc.colliderShape == "plane")
-                return;
+            if (sNode->hasPhysics && sNode->physicsDesc.colliderShape == "plane") return;
 
-            // Scale for box colliders
             Vec3 renderScale = scl;
-            if (sNode->hasPhysics &&
-                sNode->physicsDesc.colliderShape == "box") {
+            if (sNode->hasPhysics && sNode->physicsDesc.colliderShape == "box") {
                 auto& he = sNode->physicsDesc.halfExtents;
-                renderScale = {he.x * 2, he.y * 2, he.z * 2};
+                renderScale = { he.x * 2, he.y * 2, he.z * 2 };
             }
 
             DrawCall dc;
             dc.mesh = mesh;
             dc.material = mat;
-            dc.transform = Math::TRSFull(
-                pos,
-                rot.x, rot.y, rot.z,
-                renderScale);
-
+            dc.transform = Math::TRSFull(pos, rot.x, rot.y, rot.z, renderScale);
             renderer->Submit(dc);
         });
 
@@ -372,51 +340,50 @@ int main()
         glClearColor(0.05f, 0.05f, 0.07f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        riftUI.OnUIRender();
+        hud.OnUIRender();
 
-        // Render panels
-        viewportPanel.OnUIRender((uint32_t)(intptr_t)sceneTexture, ImVec2(1280, 720));
-        hierarchyPanel.OnUIRender(scene, riftUI.GetCommandBuffer());
-        inspectorPanel.OnUIRender(nullptr, riftUI.GetCommandBuffer());
-        assetPanel.OnUIRender();
-        scriptPanel.OnUIRender();
-        consolePanel.OnUIRender();
+        if (hud.IsViewportVisible()) viewportPanel.OnUIRender((uint32_t)(intptr_t)sceneTexture, ImVec2(1280, 720));
+        if (hud.IsHierarchyVisible()) hierarchyPanel.OnUIRender(scene, hud.GetCommandBuffer());
+        if (hud.IsInspectorVisible()) inspectorPanel.OnUIRender(nullptr, hud.GetCommandBuffer());
+        if (hud.IsAssetBrowserVisible()) assetPanel.OnUIRender();
+        if (hud.IsScriptingVisible()) scriptPanel.OnUIRender();
+        if (hud.IsConsoleVisible()) consolePanel.OnUIRender();
 
-        // ── Command Processing ──────────────────────────
-        auto commands = riftUI.GetCommandBuffer().Flush();
+        auto commands = hud.GetCommandBuffer().Flush();
         for (auto& cmd : commands) {
-            if (cmd.Type == UI::EditorCommandType::Play) consolePanel.AddLog("[Engine] Play Mode Started");
-            if (cmd.Type == UI::EditorCommandType::Stop) consolePanel.AddLog("[Engine] Play Mode Stopped");
+            switch (cmd.Type) {
+            case EditorCommandType::Play: consolePanel.AddLog("[Engine] Play Mode Started"); break;
+            case EditorCommandType::Stop: consolePanel.AddLog("[Engine] Play Mode Stopped"); break;
+            case EditorCommandType::NewScene: consolePanel.AddLog("[Scene] New scene created"); break;
+            case EditorCommandType::SaveScene: consolePanel.AddLog("[Scene] Scene saved"); break;
+            case EditorCommandType::OpenScene: consolePanel.AddLog("[Scene] Scene loaded"); break;
+            case EditorCommandType::Undo: consolePanel.AddLog("[Edit] Undo"); break;
+            case EditorCommandType::Redo: consolePanel.AddLog("[Edit] Redo"); break;
+            default: break;
+            }
         }
 
-        riftUI.EndFrame();
-
+        hud.EndFrame();
         device->Present();
         frameCount++;
         totalFrames++;
 
         if (frameCount % 600 == 0) {
             auto si = scene->GetSceneInfo();
-            logger->Info("Editor",
-                "Frame=" + std::to_string(frameCount) +
-                " Scene=" + si.name +
-                " Nodes=" + std::to_string(si.nodeCount));
+            logger->Info("Editor", "Frame=" + std::to_string(frameCount) + " Scene=" + si.name + " Nodes=" + std::to_string(si.nodeCount));
         }
     }
 
     // ===== CLEANUP =====
-    logger->Info("Editor",
-        "Done. Frames: " + std::to_string(totalFrames));
+    logger->Info("Editor", "Done. Frames: " + std::to_string(totalFrames));
 
     glDeleteFramebuffers(1, &fbo);
     glDeleteTextures(1, &sceneTexture);
     glDeleteRenderbuffers(1, &rbo);
 
     scriptPanel.Shutdown();
-    if (scriptMod) {
-        scriptMod->Shutdown();
-    }
-    riftUI.Shutdown();
+    if (scriptMod) scriptMod->Shutdown();
+    hud.Shutdown();
     renderer->DestroyMesh(cubeMesh);
     renderer->DestroyMesh(planeMesh);
     renderer->DestroyMesh(sphereMesh);
