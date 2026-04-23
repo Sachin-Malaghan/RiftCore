@@ -98,26 +98,26 @@ int main()
     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 
     // Set up HUD callbacks for engine interaction
-    std::string scenePath; 
+    std::string scenePath;
     HUDCallbacks callbacks;
     callbacks.OnNewScene = [&]() {
         scene->NewScene("NewScene");
         logger->Info("Editor", "Created new scene");
-    };
+        };
     callbacks.OnOpenScene = [&]() {
         auto result = scene->LoadScene(scenePath);
         if (result.IsOk()) logger->Info("Editor", "Scene loaded");
-    };
+        };
     callbacks.OnSaveScene = [&]() {
         scene->SaveScene(scenePath);
         logger->Info("Editor", "Scene saved");
-    };
+        };
     callbacks.OnPlay = [&]() { logger->Info("Editor", "Play mode started"); };
     callbacks.OnStop = [&]() { logger->Info("Editor", "Play mode stopped"); };
     callbacks.OnExecuteCommand = [&](const std::string& cmd) {
         if (scriptMod) scriptMod->ExecuteString(const_cast<char*>(cmd.c_str()));
         logger->Info("Script", ("Executed: " + cmd).c_str());
-    };
+        };
     hud.SetCallbacks(callbacks);
 
     // Initialize Visual Scripting Panel
@@ -173,7 +173,7 @@ int main()
         m.roughness = rou;
         m.albedoTex = tex;
         return m;
-    };
+        };
 
     MaterialData groundMat = makeMat(groundTex, 0, 0.9f);
     groundMat.texTileX = 8;
@@ -330,7 +330,7 @@ int main()
             dc.material = mat;
             dc.transform = Math::TRSFull(pos, rot.x, rot.y, rot.z, renderScale);
             renderer->Submit(dc);
-        });
+            });
 
         renderer->EndFrame();
 
