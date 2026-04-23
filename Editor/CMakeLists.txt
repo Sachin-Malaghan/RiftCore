@@ -1,8 +1,8 @@
-﻿cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20)
 project(RiftCoreEditor)
 
 # ── 1. Source Discovery ────────────────────────────
-# Find all our Editor UI files
+# Find all our Editor UI files (this will automatically grab src/UI/HUD.cpp now!)
 file(GLOB_RECURSE UI_SOURCES 
     "src/UI/*.cpp"
     "src/UI/Panels/*.cpp"
@@ -59,12 +59,14 @@ target_include_directories(RiftCoreEditor
         ${CMAKE_SOURCE_DIR}/ThirdParty/imgui
         ${CMAKE_SOURCE_DIR}/ThirdParty/imgui/backends
         ${CMAKE_SOURCE_DIR}/ThirdParty/imgui-node-editor
-		${CMAKE_SOURCE_DIR}/ThirdParty/stb
+        ${CMAKE_SOURCE_DIR}/ThirdParty/stb
 )
 
 # ── 4. Dependencies ─────────────────────────────────────────
-# Removed find_package(imgui)! We only need glad and glfw now.
 find_package(glad  CONFIG REQUIRED)
+# Added glfw3 and OpenGL because the Editor now handles ImGui window backends directly
+find_package(glfw3 CONFIG REQUIRED)
+find_package(OpenGL REQUIRED)
 
 target_link_libraries(RiftCoreEditor
     PRIVATE RiftCore_SDK
@@ -76,6 +78,8 @@ target_link_libraries(RiftCoreEditor
     PRIVATE RiftCore_Scene
     PRIVATE imguizmo
     PRIVATE glad::glad
+    PRIVATE glfw
+    PRIVATE OpenGL::GL
 )
 
 # ── 5. Compiler Settings ────────────────────────────────────
