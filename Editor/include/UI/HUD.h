@@ -66,7 +66,7 @@ namespace RiftCore {
     };
 
     // ── HUD class ─────────────────────────────────────────────
-    class RENDERER_API HUD {
+    class HUD {
     public:
         HUD();
         ~HUD();
