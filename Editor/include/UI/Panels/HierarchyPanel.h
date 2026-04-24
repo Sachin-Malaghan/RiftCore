@@ -13,7 +13,7 @@
  */
 
 #include <RiftCore/Scene/ISceneSystem.h>
-#include <Renderer/HUD.h>  // For CommandBuffer (consolidated UI system)
+#include <UI/HUD.h>  // For CommandBuffer (consolidated UI system)
 #include <imgui.h>
 #include <vector>
 #include <string>
