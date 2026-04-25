@@ -34,27 +34,11 @@ namespace RiftCore::UI {
  * @enum EAssetType
  * @brief Categorizes all supported asset types in the engine
  */
-enum class EAssetType : uint8_t {
-    Unknown = 0,
-    Folder,
-    Texture,        ///< Generic texture
-    Texture2D,
-    TextureCube,
-    Material,
-    Mesh,
-    SkeletalMesh,
-    Animation,
-    Audio,
-    Script,
-    Blueprint,
-    Prefab,
-    Scene,
-    Shader,
-    Font,
-    ParticleSystem,
-    PhysicsMaterial,
-    Tiles,          ///< Tile assets
-    COUNT
+enum class EAssetType : uint8_t  { Unknown = 0, Folder, Texture,        ///< Generic texture
+    Texture2D, TextureCube, Material, Mesh, SkeletalMesh,
+    Animation, Audio, Script, Blueprint, Prefab, Scene,
+    Shader, Font, ParticleSystem, PhysicsMaterial,
+    Tiles,     COUNT
 };
 
 /**
