@@ -24,6 +24,7 @@ loaded at runtime with zero hard dependencies between modules.
 | Scripting | Stub | Planned |
 | VR | Stub | Planned |
 | in editor Panels are comming
+| panel needs to be connected to backend actions 
 
 ## Features
 
