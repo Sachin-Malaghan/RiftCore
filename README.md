@@ -17,7 +17,7 @@ loaded at runtime with zero hard dependencies between modules.
 | OpenGLBackend | Complete | OpenGL 4.6, GLFW window |
 | Input | Complete | Keyboard, Mouse, GLFW callbacks |
 | Renderer | Complete | Camera, Lighting, Textures, OBJ loader, HUD |
-| Physics | Stub | Planned | Half done
+| Physics | Stub | Done | amplify it
 | Audio | Stub | Planned |
 | Asset | Stub | Planned |
 | Scene | Stub | Planned |
