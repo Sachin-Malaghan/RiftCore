@@ -1,6 +1,11 @@
 ﻿#include <Scene/SceneNode.h>
 #include <algorithm>
 
+
+
+
+
+
 namespace RiftCore {
 
     SceneNode::SceneNode(SceneNodeID id, const String& name)
