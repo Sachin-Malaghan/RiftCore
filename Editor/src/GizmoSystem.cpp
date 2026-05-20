@@ -9,8 +9,6 @@
 #include <algorithm>
 #include <cstring>
 
-
-
 namespace RiftCore {
 
     void GizmoSystem::SetViewport(
