@@ -16,7 +16,6 @@
 #include <iostream>
 #include <cstring>
 #include <GLFW/glfw3.h> // Required for window control functions
-//handle all the UI logic and distribute properly
 
 namespace RiftCore {
 
