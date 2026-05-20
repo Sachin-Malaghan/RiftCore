@@ -11,6 +11,7 @@ elseif(EXISTS "C:/vcpkg/scripts/buildsystems/vcpkg.cmake")
         CACHE STRING "")
 endif()
 
+
 project(RiftCore
     VERSION 0.1.0
     DESCRIPTION "RiftCore Modular Game Engine"
