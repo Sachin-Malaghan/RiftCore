@@ -1,6 +1,7 @@
 #pragma once
 #include <imgui.h>
 
+
 namespace RiftCore::UI {
     struct Colors {
         static constexpr ImVec4 Background      = { 0.05f, 0.05f, 0.07f, 1.00f }; 
