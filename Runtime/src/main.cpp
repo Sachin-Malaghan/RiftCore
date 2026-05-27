@@ -5,8 +5,6 @@
 #include <memory>
 #include <string>
 
-
-
 // modify and distribute or seperate all the implementation for each and everything
 
 struct MockConfig {
