@@ -131,7 +131,7 @@ SceneSystem: Manages hierarchical SceneNodes. Acts as a facade, automatically cr
 
 EditorUI & Gizmos: WYSIWYG interface using ImGui. Uses HUDCallbacks to decouple UI buttons from engine logic. GizmoSystem handles Screen-to-Ray casting and Matrix Decomposition for 3D manipulation.
 
-2. Critical Data Flows
+2. Critical Data Flows/
 The Frame Loop: Input Update -> JobSystem/ECS Systems Update -> Fixed Physics Step -> Scene Transform Sync -> Renderer Submit (DrawCalls) -> RHI Execute & Present -> Linear Allocator Reset.
 
 Scene to ECS/Physics Sync: SceneNode (Hierarchy/Transforms) explicitly stores EntityID and physicsBodyID_. When a node moves, it updates the physics body and ECS transform component, bridging human-readable hierarchies with data-oriented arrays.
