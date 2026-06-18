@@ -3,6 +3,7 @@
 # ============================================================
 add_library(RiftCore_SDK INTERFACE)
 
+
 target_include_directories(RiftCore_SDK
     INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
