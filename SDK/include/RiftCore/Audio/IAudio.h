@@ -5,7 +5,6 @@
 #include <RiftCore/Common/Result.h>
 
 namespace RiftCore {
-
     // ── Audio handles ─────────────────────────────────────────
     using AudioClipID   = u32;
     using AudioSourceID = u32;
