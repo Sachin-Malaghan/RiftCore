@@ -2,9 +2,6 @@
     src/main.cpp
 )
 
-
-
-
 target_compile_features(RiftCoreRuntime
     PRIVATE cxx_std_17
 )
