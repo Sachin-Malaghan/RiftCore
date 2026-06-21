@@ -1,7 +1,5 @@
 ﻿#include <GizmoSystem.h>
 
-
-
 #include <imgui.h>
 #include <ImGuizmo.h>
 
