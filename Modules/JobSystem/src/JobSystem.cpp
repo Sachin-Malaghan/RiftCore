@@ -8,7 +8,6 @@
 namespace RiftCore {
 
     // -- JobSystemImpl -----------------------------------------
-
     JobSystemImpl::JobSystemImpl()  = default;
     JobSystemImpl::~JobSystemImpl() {
         if (threadPool_) threadPool_->WaitAll();
