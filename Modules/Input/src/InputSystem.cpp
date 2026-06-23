@@ -11,6 +11,7 @@
 #include <iostream>
 #include <algorithm>
 
+
 namespace RiftCore {
 
     // -- GLFW Static Callbacks ---------------------------------
