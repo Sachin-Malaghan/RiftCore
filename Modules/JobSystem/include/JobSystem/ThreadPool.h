@@ -26,6 +26,7 @@
 namespace RiftCore {
 
     // Thread-safe priority queue
+
     class JOBSYSTEM_API JobQueue {
     public:
         JobQueue()  = default;
