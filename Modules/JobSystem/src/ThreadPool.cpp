@@ -7,6 +7,7 @@
 namespace RiftCore {
 
     // ── JobQueue ─────────────────────────────────────────────
+
     void JobQueue::Push(Job job) {
         std::lock_guard<std::mutex> lock(mutex_);
         queue_.push(std::move(job));
