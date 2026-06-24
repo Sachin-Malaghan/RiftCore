@@ -54,7 +54,6 @@ cd RiftCore
 cmake --preset windows-debug
 cmake --build Build/Windows-Debug --config Debug
 
-
 ## Controls (Demo)
 
 | Key | Action |
