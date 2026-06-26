@@ -15,7 +15,6 @@
 // HUD is now part of the Editor UI
 #include <UI/HUD.h>
 
-
 // Panel Includes
 #include <UI/Panels/ViewportPanel.h>
 #include <UI/Panels/HierarchyPanel.h>
