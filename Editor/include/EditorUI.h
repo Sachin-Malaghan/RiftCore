@@ -10,6 +10,7 @@
 #include <vector>
 #include <functional>
 
+
 struct GLFWwindow;
 
 namespace RiftCore {
