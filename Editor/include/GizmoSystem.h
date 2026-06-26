@@ -1,5 +1,4 @@
 ﻿#pragma once
-
 #include <RiftCore/Common/Types.h>
 #include <cstring>
 
