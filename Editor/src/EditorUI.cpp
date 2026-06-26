@@ -16,6 +16,7 @@
 #include <iostream>
 #include <cstring>
 #include <GLFW/glfw3.h> // Required for window control functions
+
 namespace RiftCore {
 
     EditorUI::EditorUI()  = default;
