@@ -10,7 +10,6 @@
 
 
 
-
 namespace RiftCore {
 
     Engine* Engine::instance_ = nullptr;
