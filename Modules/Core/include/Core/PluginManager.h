@@ -86,5 +86,4 @@ namespace RiftCore {
     };
 
 } // namespace RiftCore
-
 #pragma warning(pop)
