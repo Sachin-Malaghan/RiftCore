@@ -19,7 +19,6 @@
 #endif
 
 namespace RiftCore {
-
     class Logger;
     class EventBus;
     class EngineMemoryAllocator;
