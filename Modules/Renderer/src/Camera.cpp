@@ -1,6 +1,8 @@
 ﻿#include <Renderer/Camera.h>
 #include <cmath>
 
+
+
 namespace RiftCore {
 
     Camera::Camera() {
