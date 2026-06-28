@@ -52,6 +52,8 @@ namespace RiftCore {
     /* ══════════════════════════════════════════════════════════
      *  PhysicsWorld  –  the simulation kernel
      * ══════════════════════════════════════════════════════════*/
+
+
     class PHYSICS_API PhysicsWorld {
     public:
         PhysicsWorld();
