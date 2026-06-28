@@ -14,6 +14,9 @@
 #include <cmath>
 #include <algorithm>
 
+
+
+
 namespace RiftCore {
 
     using namespace PhysMath;
