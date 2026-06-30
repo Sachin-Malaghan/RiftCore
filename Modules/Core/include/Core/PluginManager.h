@@ -19,6 +19,10 @@
     #define CORE_API RIFTCORE_IMPORT
 #endif
 
+
+
+
+
 #ifdef RIFTCORE_PLATFORM_WINDOWS
     #include <Windows.h>
     using DLLHandle = HMODULE;
