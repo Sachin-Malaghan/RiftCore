@@ -25,6 +25,11 @@
     #define ECS_API RIFTCORE_IMPORT
 #endif
 
+
+
+
+
+
 namespace RiftCore {
 
     struct SystemEntry {
