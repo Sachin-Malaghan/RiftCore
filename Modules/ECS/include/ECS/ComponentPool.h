@@ -19,6 +19,9 @@
     #define ECS_API RIFTCORE_IMPORT
 #endif
 
+
+
+
 namespace RiftCore {
 
     // Base class for type-erased component pool
