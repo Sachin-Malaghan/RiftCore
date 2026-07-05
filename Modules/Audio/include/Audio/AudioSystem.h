@@ -15,7 +15,6 @@
 #include <mutex>
 #include <atomic>
 
-
 // Forward declare miniaudio types
 // We don't include miniaudio.h in header to keep
 // compile times fast and avoid leaking its defines
