@@ -28,8 +28,6 @@
     #define PHYSICS_API RIFTCORE_IMPORT
 #endif
 
-
-
 namespace RiftCore {
 
     class PHYSICS_API RigidBody {
