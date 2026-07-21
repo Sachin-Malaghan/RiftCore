@@ -10,10 +10,6 @@
     #define RIFT_PLUGIN_API
 #endif
 
-
-
-
-
 #include <string>
 #include <memory>
 #include <unordered_map>
