@@ -2,8 +2,6 @@
  * @file HUD.cpp
  * @brief Production-grade Editor UI System Implementation for RiftCore Engine
  */
-
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
