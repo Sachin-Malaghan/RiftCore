@@ -37,6 +37,13 @@ using byte  = uint8_t;
 // These are lightweight types — if you add GLM later,
 // you can typedef Vec3 = glm::vec3 and nothing else changes.
 
+
+
+
+
+
+
+
 namespace RiftCore {
 
     // ── 2D Vector ────────────────────────────────────────────
