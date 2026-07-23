@@ -17,6 +17,12 @@
     #define RIFTCORE_ARCH_X64 1
 #endif
 
+
+
+
+
+
+
 // Compiler detection
 #if defined(_MSC_VER)
     #define RIFTCORE_COMPILER_MSVC 1
