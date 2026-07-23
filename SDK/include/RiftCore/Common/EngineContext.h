@@ -27,6 +27,13 @@
 #include <typeindex>
 #include <mutex>
 
+
+
+
+
+
+
+
 namespace RiftCore {
     class IScripting;
     class EngineContext {
