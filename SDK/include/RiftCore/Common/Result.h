@@ -22,6 +22,13 @@
 #include <stdexcept>
 #include <functional>
 
+
+
+
+
+
+
+
 namespace RiftCore {
 
     // ── Error Type ───────────────────────────────────────────
