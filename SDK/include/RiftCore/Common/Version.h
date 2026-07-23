@@ -26,6 +26,13 @@ namespace RiftCore {
         }
     };
 
+
+
+
+
+
+
+
     // Module API version — used for compatibility checks
     // When you load a DLL, you verify its API version matches
     constexpr u32 RIFTCORE_API_VERSION_MAJOR = 0;
