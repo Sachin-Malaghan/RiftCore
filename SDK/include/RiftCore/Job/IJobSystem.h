@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-
 #include <RiftCore/Common/Platform.h>
 #include <RiftCore/Common/Types.h>
 #include <RiftCore/Common/Result.h>
@@ -10,6 +9,14 @@
 #include <memory>
 #include <chrono>
 #include <atomic>
+
+
+
+
+
+
+
+
 
 namespace RiftCore {
 
