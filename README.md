@@ -1,8 +1,5 @@
 ﻿# RiftCore Engine
-
 A production-grade modular C++ game engine built from scratch.
-
-
 ## Architecture 
 
 RiftCore is fully modular — each system is a separate DLL
