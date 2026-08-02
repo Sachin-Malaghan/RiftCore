@@ -5,10 +5,6 @@
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
-
-
-
-
 namespace RiftCore {
 
     // ── OBJModel::GetCombinedMesh ─────────────────────────────
