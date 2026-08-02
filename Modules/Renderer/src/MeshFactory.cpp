@@ -2,11 +2,6 @@
 #include <Renderer/Camera.h>
 #include <cmath>
 
-
-
-
-
-
 namespace RiftCore {
 
     MeshData MeshFactory::CreateCube(f32 size) {
