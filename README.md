@@ -137,3 +137,11 @@ Scene to ECS/Physics Sync: SceneNode (Hierarchy/Transforms) explicitly stores En
 Complete: SDK, Core, OpenGL RHI, Physics, ECS, Editor UI, Asset Loading.
 
 Pending / Stubs: IScripting (needs Lua/C#/python binding implementation) and IVRModule (needs OpenXR/OpenVR implementation and dual-eye render pass logic).
+
+
+
+
+
+
+
+
