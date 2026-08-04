@@ -3,9 +3,6 @@
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
 
-
-
-
 #include <RiftCore/Common/Platform.h>
 #include <RiftCore/Common/Types.h>
 #include <RiftCore/Common/Result.h>
