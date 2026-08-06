@@ -8,7 +8,6 @@ loaded at runtime with zero hard dependencies between modules.
 ## Modules Built
 
 
-
 | Module | Status | Description |
 |--------|--------|-------------|
 | Core | Complete | Logger, EventBus, Memory, PluginManager |
