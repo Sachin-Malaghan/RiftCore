@@ -39,6 +39,7 @@ loaded at runtime with zero hard dependencies between modules.
 - Thread pool job system (19 workers)
 - Full event bus (publish/subscribe)
 
+
 ## Requirements
 
 - Visual Studio 2022
@@ -47,12 +48,14 @@ loaded at runtime with zero hard dependencies between modules.
 
 ## Build Instructions
 
+
 bash
 cd RiftCore
 cmake --preset windows-debug
 cmake --build Build/Windows-Debug --config Debug
 
 ## Controls (Demo)
+
 
 | Key | Action |
 |-----|--------|
@@ -73,6 +76,7 @@ cmake --build Build/Windows-Debug --config Debug
 NVIDIA Quadro M4000 - OpenGL 4.6 - 60fps stable
 
 ## License
+
 
 MIT
 
