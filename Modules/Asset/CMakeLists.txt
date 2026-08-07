@@ -1,6 +1,8 @@
 ﻿# Asset Module - Stub placeholder
 # This file will be replaced when we implement this module
 
+
+
 add_library(RiftCore_Asset SHARED
     src/placeholder.cpp
 )
