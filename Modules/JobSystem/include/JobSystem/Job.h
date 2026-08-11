@@ -7,6 +7,12 @@
 #include <functional>
 
 
+
+
+
+
+
+
 namespace RiftCore {
 
     // Internal job structure used inside ThreadPool
