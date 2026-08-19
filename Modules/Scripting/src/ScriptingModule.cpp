@@ -1,5 +1,12 @@
 ﻿#include <Scripting/ScriptingModule.h>
 
+
+
+
+
+
+
+
 namespace RiftCore {
 
     ScriptingModule::ScriptingModule(): m_scene(nullptr), m_logger(nullptr) 
