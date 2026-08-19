@@ -8,6 +8,11 @@
 #include <atomic>
 #include <string> // We can safely use std::string INTERNALLY
 
+
+
+
+
+
 namespace RiftCore {
 
     struct AutomationCommand {
