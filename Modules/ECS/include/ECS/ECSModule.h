@@ -19,10 +19,6 @@
     #define ECS_API RIFTCORE_IMPORT
 #endif
 
-
-
-
-
 namespace RiftCore {
 
     class ECS_API ECSModule : public IModule {
