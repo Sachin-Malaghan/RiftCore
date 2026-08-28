@@ -19,6 +19,13 @@
     #define CORE_API RIFTCORE_IMPORT
 #endif
 
+
+
+
+
+
+
+
 namespace RiftCore {
 
     class CORE_API SystemAllocator : public IAllocator {
