@@ -24,6 +24,7 @@ loaded at runtime with zero hard dependencies between modules.
 | in editor Panels are comming
 | panel needs to be connected to backend actions 
 
+
 ## Features
 
 - Modular DLL architecture (plug and play)
