@@ -6,10 +6,6 @@
     src/Engine.cpp
 )
 
-
-
-
-
 target_compile_features(RiftCore_Core
     PUBLIC cxx_std_17
 )
