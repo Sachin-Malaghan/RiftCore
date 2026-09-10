@@ -22,6 +22,10 @@
     #define CORE_API RIFTCORE_IMPORT
 #endif
 
+
+
+
+
 namespace RiftCore {
 
     class CORE_API EventBus : public IEventBus {
