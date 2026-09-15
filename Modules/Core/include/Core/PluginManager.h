@@ -26,6 +26,9 @@
     using DLLHandle = void*;
 #endif
 
+
+
+
 namespace RiftCore {
 
     struct PluginInfo {
