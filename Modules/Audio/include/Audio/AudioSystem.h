@@ -28,10 +28,6 @@ struct ma_resource_manager;
     #define AUDIO_API RIFTCORE_IMPORT
 #endif
 
-
-
-
-
 namespace RiftCore {
 
     // ── Internal clip data ────────────────────────────────────
