@@ -12,10 +12,6 @@
 #include <cstring>
 #include <cmath>
 
-
-
-
-
 namespace RiftCore {
 
     // -- AudioSystem -------------------------------------------
