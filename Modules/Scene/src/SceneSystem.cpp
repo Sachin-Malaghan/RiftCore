@@ -4,9 +4,7 @@
 #include <RiftCore/Physics/IPhysics.h>
 #include <RiftCore/Audio/IAudio.h>
 #include <RiftCore/ECS/IECS.h>
-
 #include <json.hpp>
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
