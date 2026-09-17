@@ -78,13 +78,15 @@ NVIDIA Quadro M4000 - OpenGL 4.6 - 60fps stable
 
 ## License
 
-
 MIT
 
 SYSTEM CONTEXT: RIFTCORE ENGINE ARCHITECTURE
 Project Name: RiftCore
 Domain: Custom C++ 3D Game Engine / Simulation Framework
 Core Philosophy: Data-Oriented Design (DoD), Strict Interface Segregation, Modular Plugin Architecture (DLL-based late binding), Exception-less Error Handling (Result<T>).
+
+
+
 
 1. High-Level Layered Architecture
 The engine is strictly divided into 4 layers to prevent circular dependencies and allow hot-swapping of backend implementations.
