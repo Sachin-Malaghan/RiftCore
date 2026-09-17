@@ -29,6 +29,10 @@
 
 
 
+
+
+
+
 namespace RiftCore {
 
     struct PluginInfo {
