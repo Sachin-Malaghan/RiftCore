@@ -18,12 +18,6 @@
     #define CORE_API RIFTCORE_IMPORT
 #endif
 
-
-
-
-
-
-
 namespace RiftCore {
     class Logger;
     class EventBus;
