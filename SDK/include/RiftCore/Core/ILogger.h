@@ -8,12 +8,6 @@
 #include "../Common/Platform.h"
 #include "../Common/Types.h"
 
-
-
-
-
-
-
 namespace RiftCore {
 
     // ── Log levels ────────────────────────────────────────────
