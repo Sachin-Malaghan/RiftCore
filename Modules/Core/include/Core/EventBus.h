@@ -16,11 +16,6 @@
 #include <typeindex>
 #include <atomic>
 
-
-
-
-
-
 #ifdef CORE_EXPORTS
     #define CORE_API RIFTCORE_EXPORT
 #else
