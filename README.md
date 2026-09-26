@@ -3,9 +3,12 @@ A production-grade modular C++ game engine built from scratch.
 ## Architecture 
 
 RiftCore is fully modular — each system is a separate DLL
+
 loaded at runtime with zero hard dependencies between modules.
 
+
 ## Modules Built
+
 
 | Module | Status | Description |
 |--------|--------|-------------|
