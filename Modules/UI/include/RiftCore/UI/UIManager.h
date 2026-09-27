@@ -24,3 +24,11 @@ namespace RiftCore {
         std::string m_ActiveWorkspace;
     };
 }
+
+
+
+
+
+
+
+
