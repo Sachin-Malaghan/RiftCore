@@ -34,3 +34,8 @@ set_target_properties(RiftCore_Physics PROPERTIES
 )
 
 message(STATUS "[Module] Physics registered.")
+
+
+
+
+
