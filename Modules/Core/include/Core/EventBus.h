@@ -6,11 +6,6 @@
 #include <RiftCore/Common/Platform.h>
 #include <RiftCore/Common/Types.h>
 #include <RiftCore/Core/IEventBus.h>
-
-
-
-
-
 #include <unordered_map>
 #include <vector>
 #include <functional>
