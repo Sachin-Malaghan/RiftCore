@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <RiftCore/Common/Platform.h>
 #include <RiftCore/Common/Types.h>
@@ -65,7 +65,8 @@ namespace RiftCore {
     struct SceneLightDesc {
         Vec3  color     = {1,1,1};
         f32   intensity = 1.0f;
-        String type     = "directional";
+        String type     = "directional";   // "directional" or "point"
+        f32   range     = 20.0f;
     };
 
     // ── Scene node descriptor (for creating nodes) ────────────
@@ -154,6 +155,19 @@ namespace RiftCore {
         // ── Query ─────────────────────────────────────────────
         virtual ISceneNode* FindNode(const String& name) = 0;
         virtual u32         GetNodeCount()         const = 0;
+
+        // ── Full node access (components included) ────────────
+        // Reads the node's complete description.
+        virtual bool GetNodeDesc(SceneNodeID id,
+                                 SceneNodeDesc& out)     = 0;
+        // Re-applies name, transform and components; the physics
+        // body is rebuilt to match. The parent is not changed.
+        virtual bool UpdateNode(SceneNodeID id,
+                                const SceneNodeDesc& d)  = 0;
+        // Whole-scene snapshot as JSON text (undo, play/stop).
+        virtual String     SerializeScene()              = 0;
+        virtual VoidResult DeserializeScene(
+            const String& jsonText)                      = 0;
     };
 
 } // namespace RiftCore

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
 
@@ -71,6 +71,11 @@ namespace RiftCore {
             return static_cast<u32>(nodes_.size());
         }
 
+        bool GetNodeDesc(SceneNodeID id, SceneNodeDesc& out) override;
+        bool UpdateNode (SceneNodeID id, const SceneNodeDesc& d) override;
+        String     SerializeScene()                          override;
+        VoidResult DeserializeScene(const String& jsonText)  override;
+
     private:
         // ── Node creation helpers ─────────────────────────────
         void CreateECSEntity (SceneNode& node,
@@ -80,10 +85,8 @@ namespace RiftCore {
         void CreateAudioSource(SceneNode& node,
                                const SceneNodeDesc& desc);
 
-        // ── JSON serialization ────────────────────────────────
-        void SerializeNode  (const SceneNode& node,
-                             void* jsonObj) const;
-        void DeserializeNode(const void* jsonObj);
+        // Removes the node's physics body and audio source.
+        void ReleaseNodeResources(SceneNode& node);
 
         // ── Access helpers ────────────────────────────────────
         SceneNode* GetNodeRaw(SceneNodeID id);
@@ -96,7 +99,7 @@ namespace RiftCore {
         std::vector<SceneNodeID>        rootNodes_;
 
         std::atomic<SceneNodeID> nextNodeID_{ 1 };
-        mutable std::mutex       mutex_;
+        mutable std::recursive_mutex mutex_;
 
         String sceneName_;
         String sceneFilePath_;

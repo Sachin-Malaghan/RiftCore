@@ -23,8 +23,6 @@ target_compile_definitions(RiftCore_OpenGLBackend
 )
 
 # Find GLFW and GLAD via vcpkg
-find_package(glfw3 CONFIG REQUIRED)
-find_package(glad CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 
 target_link_libraries(RiftCore_OpenGLBackend

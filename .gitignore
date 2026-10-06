@@ -44,3 +44,10 @@ build_output.txt
 
 # CMake Build Directory
 Build/
+
+# Vendored third-party sources are always tracked
+!ThirdParty/**
+# Editor/runtime generated files
+imgui.ini
+__pycache__/
+*.pyc

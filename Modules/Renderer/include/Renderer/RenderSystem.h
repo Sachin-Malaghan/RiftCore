@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
@@ -54,6 +54,8 @@ namespace RiftCore {
 
         void OnResize   (u32 width, u32 height);
         void SetWireframe(bool enabled);
+        // Background colour used when the frame is cleared.
+        void SetClearColor(const Vec3& color) { clearColor_ = color; }
 
         RenderStats    GetStats()         const { return stats_;   }
         TextureLoader* GetTextureLoader()       { return textures_.get(); }
@@ -79,6 +81,7 @@ namespace RiftCore {
 
         RenderStats stats_;
         bool        wireframe_  = false;
+        Vec3        clearColor_ = { 0.08f, 0.08f, 0.12f };
         u64         frameIndex_ = 0;
     };
 

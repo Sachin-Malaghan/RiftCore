@@ -193,6 +193,12 @@ namespace RiftCore {
                        const Vec3& d, f32 dist)    const override;
 
         /* ── Extended API (used by other engine modules) ─────── */
+        bool       GetBodyTransform(EntityID e, Vec3& position,
+                       Vec3& eulerDeg)             const override;
+        void       SetBodyTransform(EntityID e, const Vec3& position,
+                       const Vec3& eulerDeg)             override;
+        u32        GetBodyCount()                  const override;
+
         PhysicsWorld* GetWorld()  { return world_.get(); }
         u32           AddBody    (const RigidBodyDesc& d);
         void          RemoveBody (u32 id);

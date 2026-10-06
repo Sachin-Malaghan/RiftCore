@@ -1,4 +1,4 @@
-﻿#include <Scene/SceneNode.h>
+#include <Scene/SceneNode.h>
 #include <algorithm>
 namespace RiftCore {
 
@@ -14,7 +14,6 @@ namespace RiftCore {
 
         // Accumulate parent world position
         Vec3 parentWorld = parent_->GetWorldPosition();
-        Vec3 parentScale = parent_->GetWorldPosition();
 
         // Simple world position (no rotation inheritance yet)
         return {

@@ -1,9 +1,12 @@
 @echo off
+rem Regenerates the Visual Studio solution in Build\ (keeps existing binaries).
+setlocal
+cd /d "%~dp0"
+
 echo =========================================
-echo Regenerating RiftCore Visual Studio Files
+echo  Generating RiftCore Visual Studio files
 echo =========================================
-if exist Build rmdir /s /q Build
-cmake -S . -B Build
+cmake -S . -B Build -G "Visual Studio 17 2022" -A x64
 echo.
-echo Generation Complete! Your .sln file is ready in the Build folder.
+echo Done. Open Build\RiftCore.sln or run OpenSolution.bat
 pause

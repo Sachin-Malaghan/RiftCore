@@ -1,21 +1,11 @@
-﻿cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20)
 
-# vcpkg toolchain - must be before project()
-if(DEFINED ENV{VCPKG_ROOT})
-    set(CMAKE_TOOLCHAIN_FILE
-        "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "")
-elseif(EXISTS "C:/vcpkg/scripts/buildsystems/vcpkg.cmake")
-    set(CMAKE_TOOLCHAIN_FILE
-        "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "")
-endif()
-
+# All third-party code is vendored under ThirdParty/ - no package manager needed.
 
 project(RiftCore
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "RiftCore Modular Game Engine"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -44,7 +34,7 @@ endif()
 message(STATUS "[RiftCore] Build type: ${CMAKE_BUILD_TYPE}")
 
 if(MSVC)
-    add_compile_options(/W4 /MP /std:c++17)
+    add_compile_options(/W4 /MP /std:c++17 /utf-8)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 else()
     add_compile_options(-Wall -Wextra -std=c++17)
@@ -68,11 +58,17 @@ add_subdirectory(Modules/Scene)
 add_subdirectory(Modules/Scripting)
 add_subdirectory(Modules/VR)
 add_subdirectory(Runtime)
-add_subdirectory(Editor)
+option(RIFTCORE_BUILD_EDITOR "Build the RiftCore Editor" ON)
+if(RIFTCORE_BUILD_EDITOR)
+    add_subdirectory(Editor)
+endif()
+enable_testing()
 add_subdirectory(Tests)
 
 message(STATUS "[RiftCore] Configuration complete.")
 
-# Automatically set RiftCoreEditor as the highlighted Startup Project in Visual Studio
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT RiftCoreEditor)
+# RiftCoreEditor is the startup project in Visual Studio
+if(RIFTCORE_BUILD_EDITOR)
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT RiftCoreEditor)
+endif()
 

@@ -4,6 +4,8 @@ add_library(RiftCore_Renderer SHARED
     src/RenderSystem.cpp
     src/TextureLoader.cpp
     src/OBJLoader.cpp
+    src/BuiltinModels.cpp
+    src/SceneDrawer.cpp
     # HUD.cpp is removed from here
 )
 
@@ -30,8 +32,6 @@ target_compile_definitions(RiftCore_Renderer
     PRIVATE RENDERER_EXPORTS
 )
 
-find_package(glfw3  CONFIG REQUIRED)
-find_package(glad   CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 # ImGui find_package is removed from here
 

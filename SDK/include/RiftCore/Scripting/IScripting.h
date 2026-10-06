@@ -25,6 +25,14 @@ namespace RiftCore {
         virtual VoidResult  LoadScript(const char* filePath) = 0;
         virtual VoidResult  ExecuteString(const char* code) = 0;
         virtual void        RegisterFunction(const char* name, void(*fn)()) = 0;
+
+        // Text the scripts printed since the last call (stdout + errors).
+        // The pointer stays valid until the next call.
+        virtual const char* ConsumeOutput() = 0;
+        // True when a real script interpreter (Python) is available.
+        virtual bool        IsAvailable() const = 0;
+        // While false, per-frame script callbacks are not invoked.
+        virtual void        SetSimulating(bool simulating) = 0;
     };
 
 } // namespace RiftCore

@@ -1,10 +1,8 @@
-﻿add_executable(RiftCoreRuntime
+add_executable(RiftCoreRuntime
     src/main.cpp
 )
 
-target_compile_features(RiftCoreRuntime
-    PRIVATE cxx_std_17
-)
+target_compile_features(RiftCoreRuntime PRIVATE cxx_std_17)
 
 target_link_libraries(RiftCoreRuntime
     PRIVATE RiftCore_SDK
@@ -14,27 +12,28 @@ target_link_libraries(RiftCoreRuntime
     PRIVATE RiftCore_Renderer
     PRIVATE RiftCore_Physics
     PRIVATE RiftCore_Scene
-	PRIVATE RiftCore_Scripting
+    PRIVATE glad::glad
+    PRIVATE glfw
 )
+
+# Loaded at run time (not linked): make sure they are built with the app.
+add_dependencies(RiftCoreRuntime RiftCore_Scripting)
 
 target_include_directories(RiftCoreRuntime
     PRIVATE
-		${CMAKE_SOURCE_DIR}/SDK/include
+        ${CMAKE_SOURCE_DIR}/SDK/include
         ${CMAKE_SOURCE_DIR}/Modules/Core/include
         ${CMAKE_SOURCE_DIR}/Modules/OpenGLBackend/include
         ${CMAKE_SOURCE_DIR}/Modules/Input/include
         ${CMAKE_SOURCE_DIR}/Modules/Renderer/include
         ${CMAKE_SOURCE_DIR}/Modules/Physics/include
         ${CMAKE_SOURCE_DIR}/Modules/Scene/include
-		${CMAKE_SOURCE_DIR}/Modules/Scripting/include
 )
 
-find_package(glad   CONFIG REQUIRED)
-find_package(imgui  CONFIG REQUIRED)
-target_link_libraries(RiftCoreRuntime
-    PRIVATE glad::glad
-    PRIVATE imgui::imgui
-)
+if(MSVC)
+    target_compile_options(RiftCoreRuntime PRIVATE /W3)
+    target_compile_definitions(RiftCoreRuntime PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
 
 set_target_properties(RiftCoreRuntime PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
@@ -43,12 +42,3 @@ set_target_properties(RiftCoreRuntime PROPERTIES
 )
 
 message(STATUS "[App] Runtime registered.")
-
-# Expose the new UI and RHI headers to the Runtime executable
-target_include_directories(RiftCoreRuntime PRIVATE 
-    "${CMAKE_SOURCE_DIR}/Modules/UI/include"
-    "${CMAKE_SOURCE_DIR}/Modules/RHI/include"
-)
-
-# Link the statically compiled Core module so the linker can find the compiled PluginLoader code
-target_link_libraries(RiftCoreRuntime PRIVATE RiftCore_Core)

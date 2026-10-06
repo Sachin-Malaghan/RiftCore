@@ -1,4 +1,4 @@
-﻿#include <Renderer/Camera.h>
+#include <Renderer/Camera.h>
 #include <cmath>
 
 namespace RiftCore {
@@ -21,8 +21,7 @@ namespace RiftCore {
             target_.z - position_.z
         };
         dir = Math::Normalize(dir);
-        pitch_ = Math::ToRadians(
-            std::asin(dir.y) * 180.0f / 3.14159f);
+        pitch_ = std::asin(dir.y) * 180.0f / 3.14159f;
         yaw_   = std::atan2(dir.z, dir.x) *
                  180.0f / 3.14159f;
         RecalculateVectors();

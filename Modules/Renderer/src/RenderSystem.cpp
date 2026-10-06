@@ -239,7 +239,7 @@ void main() {
 
     void RenderSystem::EndFrame() {
         // Clear screen
-        cmdList_->ClearColor(0.08f, 0.08f, 0.12f, 1.0f);
+        cmdList_->ClearColor(clearColor_.x, clearColor_.y, clearColor_.z, 1.0f);
         cmdList_->ClearDepth(1.0f);
 
         Viewport vp;

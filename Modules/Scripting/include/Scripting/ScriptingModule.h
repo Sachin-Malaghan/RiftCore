@@ -1,52 +1,61 @@
-﻿#pragma once
+#pragma once
 
 #include <RiftCore/Scripting/IScripting.h>
 #include <RiftCore/Scene/ISceneSystem.h>
 #include <RiftCore/Core/ILogger.h>
-#include <mutex>
-#include <queue>
-#include <atomic>
-#include <string> // We can safely use std::string INTERNALLY
-
-
-
-
-
+#include <string>
+#include <vector>
 
 namespace RiftCore {
 
-    struct AutomationCommand {
-        enum class Type { SpawnNode, InjectFlux, ClearScene };
-        Type type;
-        SceneNodeDesc nodeDesc;
-        f32 fluxAmount;
-    };
+    class EngineContext;
+    class IPhysics;
 
+    // Embedded Python scripting. Scripts import the built-in `riftcore`
+    // module to build and drive the scene (see Assets/Scripts/README.md).
+    // When the engine is built without Python the module still loads and
+    // reports IsAvailable() == false.
     class ScriptingModule : public IScripting {
     public:
         ScriptingModule();
-        virtual ~ScriptingModule() override;
+        ~ScriptingModule() override;
 
-        // Core lifecycle methods
-        // --- IModule Interface Overrides ---
-        virtual VoidResult  Initialize(const ModuleInitParams& params) override; // Fixed signature
-        virtual void        Shutdown() override;
-        virtual void        OnUpdate(f32 deltaTime) override;                    // Renamed to OnUpdate
-        virtual ModuleDescriptor GetDescriptor() const override;                 // Added missing method
+        // --- IModule ---
+        VoidResult       Initialize(const ModuleInitParams& params) override;
+        void             Shutdown() override;
+        void             OnUpdate(f32 deltaTime) override;
+        ModuleDescriptor GetDescriptor() const override;
 
-        // --- IScripting Interface Overrides ---
-        virtual VoidResult  LoadScript(const char* filePath) override;
-        virtual VoidResult  ExecuteString(const char* code) override;
-        virtual void        RegisterFunction(const char* name, void(*fn)()) override;
+        // --- IScripting ---
+        VoidResult  LoadScript(const char* filePath) override;
+        VoidResult  ExecuteString(const char* code) override;
+        void        RegisterFunction(const char* name, void(*fn)()) override;
+        const char* ConsumeOutput() override;
+        bool        IsAvailable() const override { return available_; }
+        void        SetSimulating(bool simulating) override { simulating_ = simulating; }
+
+        // --- Used by the Python bindings ---
+        ISceneSystem* Scene()   const;
+        IPhysics*     Physics() const;
+        ILogger*      Logger()  const;
+        void  AppendOutput(const char* text);
+        void  AddUpdateCallback(void* pyCallable);
+        void  ClearUpdateCallbacks();
+        f64   GetTime()      const { return time_; }
+        bool  IsSimulating() const { return simulating_; }
 
     private:
-        void ProcessCommandQueue();
+        VoidResult Run(const std::string& source, const char* fileName, bool interactive);
 
-        ISceneSystem* m_scene;
-        ILogger* m_logger;
-        std::atomic<bool> m_initialized{ false };
+        EngineContext* context_     = nullptr;
+        bool           initialized_ = false;
+        bool           available_   = false;
+        bool           simulating_  = true;
+        f64            time_        = 0.0;
 
-        std::queue<AutomationCommand> m_commandQueue;
-        std::mutex m_queueMutex;
+        std::string        output_;
+        std::string        consumed_;
+        std::vector<void*> updateCallbacks_;   // PyObject*
     };
-}
+
+} // namespace RiftCore

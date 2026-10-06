@@ -1,4 +1,4 @@
-﻿#include <Renderer/RenderTypes.h>
+#include <Renderer/RenderTypes.h>
 #include <Renderer/Camera.h>
 #include <cmath>
 namespace RiftCore {
@@ -128,7 +128,7 @@ namespace RiftCore {
                 u32 br = (i+1)*r + j + 1;
                 mesh.indices.insert(
                     mesh.indices.end(),
-                    {tl, bl, tr, tr, bl, br});
+                    {tl, tr, bl, tr, br, bl});
             }
         }
         return mesh;

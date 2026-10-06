@@ -22,8 +22,6 @@ target_compile_definitions(RiftCore_Input
 )
 
 # Input needs GLFW and GLAD (shares window with OpenGLBackend)
-find_package(glfw3 CONFIG REQUIRED)
-find_package(glad  CONFIG REQUIRED)
 
 target_link_libraries(RiftCore_Input
     PRIVATE glfw

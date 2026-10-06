@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
@@ -81,6 +81,16 @@ namespace RiftCore {
         void SetParentNode(SceneNode* parent) {
             parent_ = parent;
         }
+
+        // Pose written by the physics step: does not mark the node dirty,
+        // so it is not pushed straight back to the body.
+        void SyncFromPhysics(const Vec3& p, const Vec3& r) {
+            localPosition_ = p;
+            localRotation_ = r;
+        }
+
+        // True when the entity id came from the ECS module.
+        bool ownsEcsEntity = false;
 
         bool  IsDirty() const { return dirty_; }
         void  ClearDirty()    { dirty_ = false; }

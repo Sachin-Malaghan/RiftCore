@@ -17,6 +17,7 @@
  *──────────────────────────────────────────────────────────────────────────*/
 #pragma warning(disable: 4190)
 #include <Physics/PhysicsWorld.h>
+#include <RiftCore/Common/EulerUtil.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
 
@@ -223,18 +224,6 @@ namespace RiftCore {
         auto t1 = std::chrono::high_resolution_clock::now();
         stats_.stepTimeMs = std::chrono::duration<f32,std::milli>(t1-t0).count();
 
-        // ── Periodic debug log ────────────────────────────────
-        static u32 dbgFrame = 0;
-        if (++dbgFrame % 120 == 0) {
-            std::cout
-                << "[Physics] bodies=" << stats_.bodyCount
-                << " active="  << stats_.activeCount
-                << " pairs="   << totalPairs
-                << " manifolds=" << totalManifolds
-                << " contacts="  << totalContacts
-                << " solver="  << stats_.solverMs << "ms"
-                << " total="   << stats_.stepTimeMs << "ms\n";
-        }
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -283,10 +272,12 @@ namespace RiftCore {
             }
 
             for (u32 j : candidates) {
-                if (j <= i) continue;  // canonical order + skip self
+                if (j == i) continue;  // skip self
 
-                // De-duplicate
-                u64 key = (static_cast<u64>(i) << 32) | j;
+                // De-duplicate on the ordered pair (lo, hi)
+                u32 lo = i < j ? i : j;
+                u32 hi = i < j ? j : i;
+                u64 key = (static_cast<u64>(lo) << 32) | hi;
                 if (!seen.insert(key).second) continue;
 
                 RigidBody& b = bodies_[j];
@@ -305,7 +296,7 @@ namespace RiftCore {
 
                 // Fine AABB overlap
                 if (a.GetAABB().Overlaps(b.GetAABB()))
-                    pairs.push_back({i, j});
+                    pairs.push_back({lo, hi});
             }
         }
     }
@@ -1387,6 +1378,35 @@ namespace RiftCore {
         hit.point    = r.point;
         hit.normal   = r.normal;
         return hit;
+    }
+
+    bool PhysicsSystemImpl::GetBodyTransform(
+        EntityID e, Vec3& position, Vec3& eulerDeg) const
+    {
+        auto it = entityToBody_.find(e);
+        if (it == entityToBody_.end() || !world_) return false;
+        RigidBody* b = const_cast<PhysicsWorld*>(world_.get())->GetBody(it->second);
+        if (!b) return false;
+        position = b->GetPosition();
+        eulerDeg = EulerUtil::QuatToEulerDeg(b->GetOrientation());
+        return true;
+    }
+
+    void PhysicsSystemImpl::SetBodyTransform(
+        EntityID e, const Vec3& position, const Vec3& eulerDeg)
+    {
+        auto it = entityToBody_.find(e);
+        if (it == entityToBody_.end() || !world_) return;
+        RigidBody* b = world_->GetBody(it->second);
+        if (!b) return;
+        b->SetPosition(position);
+        b->SetOrientation(EulerUtil::EulerDegToQuat(eulerDeg));
+        b->SetVelocity(Vec3::Zero());
+        b->SetAngularVelocity(Vec3::Zero());
+    }
+
+    u32 PhysicsSystemImpl::GetBodyCount() const {
+        return world_ ? world_->GetBodyCount() : 0;
     }
 
     void PhysicsSystemImpl::ClearAllBodies() {

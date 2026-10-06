@@ -1,157 +1,165 @@
-﻿# RiftCore Engine
-A production-grade modular C++ game engine built from scratch.
-## Architecture 
+# RiftCore Engine
 
-RiftCore is fully modular — each system is a separate DLL
+A modular C++17 simulation / game engine with an editor, a rigid-body
+physics world, a built-in model library and Python scripting. Every system
+is a separate DLL loaded at run time behind an SDK interface.
 
-loaded at runtime with zero hard dependencies between modules.
+## Quick start (Windows)
 
+You need **Visual Studio 2022** (Desktop development with C++) and
+**CMake 3.20+**. Nothing else - all third-party code is in `ThirdParty/`.
 
-## Modules Built
-
-
-| Module | Status | Description |
-|--------|--------|-------------|
-| Core | Complete | Logger, EventBus, Memory, PluginManager |
-| JobSystem | Complete | Thread pool, 19 workers, ParallelFor |
-| ECS | Complete | World, ComponentPools, Systems |
-| OpenGLBackend | Complete | OpenGL 4.6, GLFW window |
-| Input | Complete | Keyboard, Mouse, GLFW callbacks |
-| Renderer | Complete | Camera, Lighting, Textures, OBJ loader, HUD |
-| Physics | Stub | Done | amplify it
-| Audio | Stub | Planned |
-| Asset | Stub | Planned |
-| Scene | Stub | Planned |
-| Scripting | Stub | Planned |
-| VR | Stub | Planned |
-| in editor Panels are comming
-| panel needs to be connected to backend actions 
-
-
-## Features
-
-- Modular DLL architecture (plug and play)
-- OpenGL 4.6 rendering with Blinn-Phong lighting
-- Procedural texture generation + stb_image file loading
-- OBJ model loading with MTL material support
-- UV mapping and texture tiling
-- FPS camera (WASD + arrow keys)
-- Wireframe debug mode
-- ImGui HUD overlay with real-time stats
-- Multi-object selection and transform system
-- ECS world with component pools
-- Thread pool job system (19 workers)
-- Full event bus (publish/subscribe)
-
-
-## Requirements
-
-- Visual Studio 2022
-- CMake 3.20+
-- vcpkg with: glfw3, glad, imgui, opengl
-
-## Build Instructions
-
-
-bash
+```
+git clone https://github.com/Sachin-Malaghan/RiftCore.git
 cd RiftCore
-cmake --preset windows-debug
-cmake --build Build/Windows-Debug --config Debug
+RunEditor.bat
+```
 
-## Controls (Demo)
+`RunEditor.bat` builds the engine in Release the first time (a few minutes)
+and starts the editor. To build by hand:
 
+```
+cmake -S . -B Build -G "Visual Studio 17 2022" -A x64
+cmake --build Build --config Release
+Build\bin\RiftCoreEditor.exe
+```
 
-| Key | Action |
-|-----|--------|
-| WASD | Move camera |
-| Arrow Keys | Rotate camera |
-| TAB | Cycle selected object |
-| IJKL | Move selected object |
-| Num4/6 | Rotate Y axis |
-| Num8/2 | Rotate X axis |
-| Z/X | Scale down/up |
-| C | Reset transform |
-| F | Toggle wireframe |
-| H | Toggle HUD |
-| ESC | Quit |
+A GPU with **OpenGL 4.6** is required for the editor and the windowed
+runtime (tested on an NVIDIA Quadro M4000).
 
-## GPU Tested
+### Python (optional)
 
-NVIDIA Quadro M4000 - OpenGL 4.6 - 60fps stable
+Scripting embeds the Python 3 that CMake finds when you configure. Install
+Python 3 from python.org (the default install includes the development
+files) *before* running CMake. Without it everything still builds and runs;
+the editor reports "Python off" and scripts cannot be run. If you
+install Python later, delete `Build\CMakeCache.txt` and build again.
+
+### If a DLL goes missing right after a build
+
+Some antivirus tools quarantine freshly built, unsigned DLLs for a moment
+(seen with Avast and `glfw3.dll`). Build again, or exclude the `Build`
+folder in the antivirus.
+
+## The editor
+
+```
+ menu bar / toolbar (file, undo, tools, snap, play - pause - stop - step)
+ [Outliner | Place]   [ Viewport                        ]   [Details | World | Stats]
+                      [Content Browser | Console | Python]
+ status bar
+```
+
+* **Outliner** - scene tree with search, rename, duplicate, delete, show / hide.
+* **Place** - the model library: click a tile to drop a model where you are looking,
+  optionally with a static collider or a dynamic body.
+* **Viewport** - click to select, move / rotate / scale gizmos with snapping.
+* **Details** - transform, model, colour, metallic / roughness, physics body and collider, light.
+* **World** - sun, sky colour, gravity (Earth / Moon / Mars / zero-g presets), camera, snapping.
+* **Stats** - frame time graph, draw calls, triangles, bodies.
+* **Content Browser** - browse `Assets/`; double-click a scene to open it, a mesh to place it,
+  a script to open it.
+* **Console** - engine and script output with filters, plus a Python prompt.
+* **Python** - script editor with Run (Ctrl+Enter), Save and the scripts in `Assets/Scripts`.
+
+Play (F5) runs physics and script callbacks; Stop restores the scene exactly
+as it was. Every edit is undoable (Ctrl+Z / Ctrl+Y).
+
+| Input | Action |
+|---|---|
+| Right mouse + drag | look around |
+| Right mouse + W A S D Q E | fly (Shift = faster) |
+| Mouse wheel | move forward / back |
+| Left click | select |
+| Q / W / E / R | select / move / rotate / scale |
+| F | focus the selection |
+| Ctrl+D, Del | duplicate, delete |
+| Ctrl+N / O / S, Ctrl+Shift+S | new / open / save / save as |
+| F5 | play / stop |
+
+Command line: `RiftCoreEditor [--scene file.json] [--script file.py] [--select "Node"] [--play]`.
+
+## Built-in models
+
+30 models are generated by the engine itself (no asset files): 14 shapes
+(cube, sphere, plane, cylinder, cone, capsule, torus, pyramid, wedge, tube,
+dome, disc, stairs, gem) and 16 props (pine tree, round tree, rock, table,
+chair, barrel, crate, street lamp, fence, rocket, car, house, tower, bridge,
+satellite, robot). `.obj` files in `Assets/Models` can be placed too.
+
+A node's mesh is `"primitive:<name>"`, `"model:<name>"` or a path to an
+`.obj`. Add your own in `Modules/Renderer/src/BuiltinModels.cpp` and list it
+in `SDK/include/RiftCore/Scene/ModelCatalog.h`; it then shows up in the Place
+tab, the Create menu and `riftcore.models()` automatically.
+
+## Python scripting
+
+```python
+import riftcore as rc
+
+rc.spawn("plane", name="Ground", scale=(40, 1, 40), physics="static")
+for i in range(5):
+    rc.spawn("model:crate", position=(0, 0.5 + i * 1.05, 0), physics="dynamic")
+
+@rc.on_update                      # runs every simulated frame
+def spin(dt):
+    car = rc.find("Car")
+    if car:
+        x, y, z = rc.get_rotation(car)
+        rc.set_rotation(car, (x, y + 90 * dt, z))
+```
+
+Full reference and samples: [Assets/Scripts/README.md](Assets/Scripts/README.md).
+Scripts also run without the editor:
+
+```
+Build\bin\RiftCoreRuntime.exe --script Assets/Scripts/demo_dominoes.py
+Build\bin\RiftCoreRuntime.exe --headless --frames 600 --script my_sim.py
+```
+
+## Tests
+
+```
+ctest --test-dir Build -C Release --output-on-failure
+```
+
+Two headless tests: the engine boots and steps a scene, and a Python script
+exercises the scripting API, scene save / load and the physics result.
+
+## Architecture
+
+| Layer | Contents |
+|---|---|
+| `SDK/` | interfaces and shared types only (`IModule`, `IPhysics`, `ISceneSystem`, `IScripting`, `Result<T>`, math) |
+| `Modules/Core` | engine lifecycle, logger, event bus, allocators, plugin manager |
+| `Modules/*` | one DLL per system, created through `CreateModule()` |
+| `Runtime/`, `Editor/` | applications that load the modules |
+
+| Module | State |
+|---|---|
+| Core, JobSystem, ECS | working |
+| OpenGLBackend | OpenGL 4.6 RHI, GLFW window |
+| Renderer | forward renderer (one directional light, Blinn-Phong), textures, OBJ loader, model library, `SceneDrawer` |
+| Physics | rigid bodies: box / sphere / capsule / plane, sequential-impulse solver, raycasts |
+| Scene | node hierarchy, components, JSON save / load, physics <-> transform sync |
+| Scripting | embedded Python (`riftcore` module) |
+| Input | keyboard / mouse (used by the Runtime) |
+| Audio | miniaudio wrapper (not exposed in the editor yet) |
+| Asset, RHI, VR | stubs |
+
+Frame: scripts -> fixed-step physics -> scene sync -> render -> present.
+
+### Not there yet
+
+RiftCore is a small engine, not an Unreal replacement. Known gaps: no
+shadows, PBR, post-processing or multiple lights; no skeletal animation;
+physics has no mesh colliders and tall box stacks are not perfectly stable;
+the editor layout is fixed (resizable panels, no free docking); Linux builds
+are untested.
+
+`Editor/src/UI` and `Editor/include` hold the previous editor UI. It is no
+longer compiled and can be deleted.
 
 ## License
 
-MIT
-
-SYSTEM CONTEXT: RIFTCORE ENGINE ARCHITECTURE
-Project Name: RiftCore
-Domain: Custom C++ 3D Game Engine / Simulation Framework
-Core Philosophy: Data-Oriented Design (DoD), Strict Interface Segregation, Modular Plugin Architecture (DLL-based late binding), Exception-less Error Handling (Result<T>).
-
-
-
-
-1. High-Level Layered Architecture
-The engine is strictly divided into 4 layers to prevent circular dependencies and allow hot-swapping of backend implementations.
-
-Layer 1: SDK (The Contract)
-Purpose: Contains pure virtual interfaces, primitive types, and math libraries. Other layers only link against the SDK.
-
-Key Interfaces: IModule, IRHI (Render Hardware Interface), IECS, IAudio, IPhysics, ISceneSystem, IAssetSystem, IJobSystem.
-
-Core Types: * Result<T> and VoidResult for monadic error handling (no try/catch).
-
-Type-safe Handles (e.g., Handle<TextureTag>) to prevent ID mismatch.
-
-Custom Math library (Vec3, Mat4, Quat).
-
-Layer 2: Core (The Foundation)
-Purpose: Engine lifecycle, resource management, and cross-module communication.
-
-EngineContext (Service Locator Pattern): A type-safe map (std::type_index -> void*) holding pointers to active systems. Modules request dependencies via context->Require<IPhysics>().
-
-EventBus: Pub/Sub system for decoupled communication (e.g., InputSystem publishes KeyPressedEvent). Supports immediate and queued dispatch.
-
-Memory Allocators: Three strategies: SystemAllocator (standard heap), LinearAllocator (per-frame temporary allocations, resets at EndFrame), and PoolAllocator (fixed-size blocks for ECS components).
-
-Job System: Multi-threaded ThreadPool using std::priority_queue and std::shared_future (JobState / JobHandle) for asynchronous tasks and ParallelFor loops.
-
-Layer 3: Modules (The Implementations)
-Purpose: Concrete logic compiled as dynamic libraries (DLLs). Loaded at runtime by the PluginLoader via CreateModule() C-exports.
-
-Current Modules:
-
-OpenGLBackend: Implements IRHI using a Command List pattern (IRHICommandList) to prepare for future Vulkan/DX12 support.
-
-Physics: Impulse-based rigid body dynamics with Broadphase (AABB) and Narrowphase collision detection. Runs on a fixed timestep accumulator.
-
-ECS: Sparse-set / Dense-array hybrid (ComponentPool<T>). Systems iterate over contiguous memory via ForEach templates to maximize CPU cache locality.
-
-Audio: Abstraction over miniaudio.
-
-Renderer: High-level rendering, material systems, and OBJ/Texture loaders.
-
-Layer 4: Application / Editor (The Consumer)
-Purpose: Orchestrates the engine for specific tools (e.g., HousePlanEditor).
-
-SceneSystem: Manages hierarchical SceneNodes. Acts as a facade, automatically creating corresponding ECS Entities and Physics RigidBody objects when a node is created. Uses a dirty_ flag pattern for transform hierarchies.
-
-EditorUI & Gizmos: WYSIWYG interface using ImGui. Uses HUDCallbacks to decouple UI buttons from engine logic. GizmoSystem handles Screen-to-Ray casting and Matrix Decomposition for 3D manipulation.
-
-2. Critical Data Flows/
-The Frame Loop: Input Update -> JobSystem/ECS Systems Update -> Fixed Physics Step -> Scene Transform Sync -> Renderer Submit (DrawCalls) -> RHI Execute & Present -> Linear Allocator Reset.
-
-Scene to ECS/Physics Sync: SceneNode (Hierarchy/Transforms) explicitly stores EntityID and physicsBodyID_. When a node moves, it updates the physics body and ECS transform component, bridging human-readable hierarchies with data-oriented arrays.
-
-3. Current Development State
-Complete: SDK, Core, OpenGL RHI, Physics, ECS, Editor UI, Asset Loading.
-
-Pending / Stubs: IScripting (needs Lua/C#/python binding implementation) and IVRModule (needs OpenXR/OpenVR implementation and dual-eye render pass logic).
-
-
-
-
-
-
-
-
+MIT. Third-party licenses: [ThirdParty/README.md](ThirdParty/README.md).

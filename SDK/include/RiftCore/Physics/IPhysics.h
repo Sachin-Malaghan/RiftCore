@@ -168,6 +168,16 @@ namespace RiftCore {
             const Vec3& origin,
             const Vec3& direction,
             f32 maxDist = 1000.0f)                       const = 0;
+
+        // Pose access (rotation = engine Euler degrees, see EulerUtil.h).
+        // GetBodyTransform returns false if the entity has no body.
+        virtual bool GetBodyTransform(
+            EntityID e, Vec3& position, Vec3& eulerDeg)  const = 0;
+        // Teleports the body and clears its velocity.
+        virtual void SetBodyTransform(
+            EntityID e, const Vec3& position,
+            const Vec3& eulerDeg)                              = 0;
+        virtual u32  GetBodyCount()                      const = 0;
     };
 
 } // namespace RiftCore

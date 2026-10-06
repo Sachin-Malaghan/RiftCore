@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
@@ -105,6 +105,11 @@ namespace RiftCore {
                                       u32 slices = 16);
         static MeshData CreatePyramid(f32 base   = 1.0f,
                                       f32 height = 1.5f);
+
+        // Built-in model library (see Scene/ModelCatalog.h). `path` is
+        // "primitive:<name>" or "model:<name>"; the bare name also works.
+        // Returns false for an unknown name.
+        static bool CreateBuiltin(const String& path, MeshData& out);
     };
 
 } // namespace RiftCore
