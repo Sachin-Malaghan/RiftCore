@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 
 # All third-party code is vendored under ThirdParty/ - no package manager needed.
 

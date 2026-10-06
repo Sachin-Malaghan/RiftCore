@@ -1,4 +1,4 @@
-﻿add_library(RiftCore_OpenGLBackend SHARED
+add_library(RiftCore_OpenGLBackend SHARED
     src/GLDevice.cpp
     src/OpenGLModule.cpp
 )
@@ -26,7 +26,7 @@ target_compile_definitions(RiftCore_OpenGLBackend
 find_package(OpenGL REQUIRED)
 
 target_link_libraries(RiftCore_OpenGLBackend
-    PRIVATE glfw
+    PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,glfw>
     PRIVATE glad::glad
     PRIVATE OpenGL::GL
 )
@@ -38,3 +38,7 @@ set_target_properties(RiftCore_OpenGLBackend PROPERTIES
 )
 
 message(STATUS "[Module] OpenGLBackend registered.")
+
+# GLFW lives inside this DLL: export its headers' users to it.
+target_include_directories(RiftCore_OpenGLBackend PUBLIC ${CMAKE_SOURCE_DIR}/ThirdParty/glfw/include)
+target_link_libraries(glfw_api INTERFACE RiftCore_OpenGLBackend)

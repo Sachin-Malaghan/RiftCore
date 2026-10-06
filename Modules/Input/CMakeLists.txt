@@ -1,4 +1,4 @@
-﻿add_library(RiftCore_Input SHARED
+add_library(RiftCore_Input SHARED
     src/InputSystem.cpp
 )
 
@@ -24,7 +24,7 @@ target_compile_definitions(RiftCore_Input
 # Input needs GLFW and GLAD (shares window with OpenGLBackend)
 
 target_link_libraries(RiftCore_Input
-    PRIVATE glfw
+    PRIVATE glfw_api
     PRIVATE glad::glad
 )
 

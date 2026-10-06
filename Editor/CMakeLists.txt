@@ -37,7 +37,7 @@ target_link_libraries(RiftCoreEditor
     PRIVATE imguizmo
     PRIVATE nlohmann_json
     PRIVATE glad::glad
-    PRIVATE glfw
+    PRIVATE glfw_api
     PRIVATE OpenGL::GL
 )
 if(WIN32)

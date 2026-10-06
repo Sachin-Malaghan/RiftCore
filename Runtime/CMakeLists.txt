@@ -13,7 +13,7 @@ target_link_libraries(RiftCoreRuntime
     PRIVATE RiftCore_Physics
     PRIVATE RiftCore_Scene
     PRIVATE glad::glad
-    PRIVATE glfw
+    PRIVATE glfw_api
 )
 
 # Loaded at run time (not linked): make sure they are built with the app.

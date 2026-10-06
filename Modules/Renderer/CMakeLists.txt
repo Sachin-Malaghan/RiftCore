@@ -38,7 +38,7 @@ find_package(OpenGL REQUIRED)
 # ImGui find_package is removed from here
 
 target_link_libraries(RiftCore_Renderer
-    PRIVATE glfw
+    PRIVATE glfw_api
     PRIVATE glad::glad
     PRIVATE OpenGL::GL
     # ImGui linking is removed from here

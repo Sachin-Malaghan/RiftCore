@@ -3,19 +3,29 @@
 # fresh clone builds with nothing but CMake + a C++17 compiler.
 # ============================================================
 
-# -- GLFW 3.4 (shared: one window/context state for all modules)
+# -- GLFW 3.4 ---------------------------------------------------
+# Built as a static library and linked whole into RiftCore_OpenGLBackend,
+# which re-exports it. Every module therefore shares one GLFW state without
+# a separate glfw3.dll (antivirus tools tend to quarantine a freshly built,
+# unsigned glfw3.dll). Other targets use the `glfw_api` interface target.
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
 set(_rc_shared_backup ${BUILD_SHARED_LIBS})
-set(BUILD_SHARED_LIBS ON)
+set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(glfw)
 set(BUILD_SHARED_LIBS ${_rc_shared_backup})
-set_target_properties(glfw PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin")
+set_target_properties(glfw PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(WIN32)
+    target_compile_definitions(glfw PRIVATE _GLFW_BUILD_DLL)   # mark the API for export
+endif()
+
+add_library(glfw_api INTERFACE)
+target_include_directories(glfw_api INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/glfw/include)
+if(WIN32)
+    target_compile_definitions(glfw_api INTERFACE GLFW_DLL)
+endif()
 
 # -- glad (OpenGL 4.6 loader) ---------------------------------
 add_library(glad STATIC glad/src/glad.c)
@@ -54,7 +64,7 @@ target_include_directories(imgui PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/misc/cpp)
-target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
+target_link_libraries(imgui PUBLIC glfw_api OpenGL::GL)
 add_library(imgui::imgui ALIAS imgui)
 
 # -- ImGuizmo --------------------------------------------------

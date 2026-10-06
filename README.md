@@ -7,7 +7,7 @@ is a separate DLL loaded at run time behind an SDK interface.
 ## Quick start (Windows)
 
 You need **Visual Studio 2022** (Desktop development with C++) and
-**CMake 3.20+**. Nothing else - all third-party code is in `ThirdParty/`.
+**CMake 3.24+**. Nothing else - all third-party code is in `ThirdParty/`.
 
 ```
 git clone https://github.com/Sachin-Malaghan/RiftCore.git
@@ -35,11 +35,12 @@ files) *before* running CMake. Without it everything still builds and runs;
 the editor reports "Python off" and scripts cannot be run. If you
 install Python later, delete `Build\CMakeCache.txt` and build again.
 
-### If a DLL goes missing right after a build
+### Antivirus
 
-Some antivirus tools quarantine freshly built, unsigned DLLs for a moment
-(seen with Avast and `glfw3.dll`). Build again, or exclude the `Build`
-folder in the antivirus.
+GLFW is compiled into `RiftCore_OpenGLBackend.dll` rather than shipped as a
+separate `glfw3.dll`, because Avast repeatedly removed a freshly built
+`glfw3.dll`. If an antivirus still removes a RiftCore DLL after a build,
+build again or exclude the `Build` folder.
 
 ## The editor
 
