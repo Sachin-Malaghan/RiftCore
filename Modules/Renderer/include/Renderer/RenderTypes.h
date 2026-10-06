@@ -71,6 +71,12 @@ namespace RiftCore {
         Texture2D* albedoTex   = nullptr;
         Texture2D* normalTex   = nullptr;
         Texture2D* metallicTex = nullptr;
+        Texture2D* roughTex    = nullptr;
+
+        // Realistic mode: world-space texture size (metres per repeat,
+        // 0 = untextured) and transparency (1 = opaque).
+        f32 texScale = 0.0f;
+        f32 opacity  = 1.0f;
 
         // Tiling
         f32 texTileX = 1.0f;

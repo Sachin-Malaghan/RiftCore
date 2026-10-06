@@ -129,6 +129,9 @@ namespace RiftCore {
         float  camYaw_ = -90.0f, camPitch_ = -20.0f;
         float  camSpeed_ = 10.0f, camFov_ = 60.0f;
         bool   wireframe_ = false;
+        bool   realistic_ = false;      // render mode: Solid / Realistic
+        bool   shadows_ = true;
+        float  exposure_ = 1.0f;
         bool   showBounds_ = true;
         bool   flying_ = false;
 

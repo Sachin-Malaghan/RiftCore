@@ -32,6 +32,7 @@
 namespace RiftCore {
 
     class GLPipeline;
+    class RealisticPass;
 
     class RENDERER_API RenderSystem {
     public:
@@ -54,6 +55,12 @@ namespace RiftCore {
 
         void OnResize   (u32 width, u32 height);
         void SetWireframe(bool enabled);
+        // Render mode: Solid (fast, flat colours - the modelling view) or
+        // Realistic (PBR materials, textures, sun shadows, sky, tone mapping).
+        void SetRealistic(bool on)  { realistic_ = on; }
+        bool IsRealistic()    const { return realistic_; }
+        void SetShadows(bool on)    { shadows_ = on; }
+        void SetExposure(f32 e)     { exposure_ = e; }
         // Background colour used when the frame is cleared.
         void SetClearColor(const Vec3& color) { clearColor_ = color; }
 
@@ -82,6 +89,10 @@ namespace RiftCore {
         RenderStats stats_;
         bool        wireframe_  = false;
         Vec3        clearColor_ = { 0.08f, 0.08f, 0.12f };
+        bool        realistic_  = false;
+        bool        shadows_    = true;
+        f32         exposure_   = 1.0f;
+        RealisticPass* realisticPass_ = nullptr;
         u64         frameIndex_ = 0;
     };
 

@@ -1,5 +1,6 @@
 #pragma warning(disable: 4190)
 #include <Renderer/RenderSystem.h>
+#include "RealisticPass.h"
 #include <OpenGLBackend/GLDevice.h>
 #include <RiftCore/Common/EngineContext.h>
 #include <RiftCore/Core/ILogger.h>
@@ -210,6 +211,8 @@ void main() {
             RIFTCORE_UNUSED(dc);
         }
 
+        delete realisticPass_;
+        realisticPass_ = nullptr;
         if (textures_) { textures_->UnloadAll(); textures_.reset(); }
         if (cmdList_)     { device_->DestroyCommandList(cmdList_);  cmdList_     = nullptr; }
         if (pipeline_)    { device_->DestroyPipeline(pipeline_);    pipeline_    = nullptr; }
@@ -243,6 +246,15 @@ void main() {
     }
 
     void RenderSystem::EndFrame() {
+        if (realistic_ && !wireframe_) {
+            if (!realisticPass_) realisticPass_ = new RealisticPass();
+            realisticPass_->SetShadows(shadows_);
+            realisticPass_->SetExposure(exposure_);
+            stats_.drawCalls = 0;
+            stats_.triangles = 0;
+            realisticPass_->Render(drawQueue_, lights_, camera_, width_, height_, stats_);
+            return;
+        }
         // Clear screen
         cmdList_->ClearColor(clearColor_.x, clearColor_.y, clearColor_.z, 1.0f);
         cmdList_->ClearDepth(1.0f);
@@ -463,6 +475,7 @@ void main() {
 
     void RenderSystem::DestroyMesh(GPUMesh* mesh) {
         if (!mesh) return;
+        if (realisticPass_) realisticPass_->ForgetMesh(mesh);
         if (mesh->vertexBuffer)
             device_->DestroyBuffer(mesh->vertexBuffer);
         if (mesh->indexBuffer)

@@ -110,18 +110,19 @@ namespace RiftCore {
             static const char* kwlist[] = {
                 "kind", "name", "position", "rotation", "scale", "color", "physics",
                 "mass", "metallic", "roughness", "restitution", "friction", "parent",
-                nullptr };
+                "material", nullptr };
             const char* kind = nullptr; const char* name = nullptr; const char* physics = nullptr;
+            const char* material = nullptr;
             SceneNodeDesc d;
             d.mesh.albedo = { 0.8f, 0.8f, 0.8f };
             f32 mass = 1.0f;
             unsigned int parent = 0;
-            if (!PyArg_ParseTupleAndKeywords(args, kw, "s|zO&O&O&O&zfffffI",
+            if (!PyArg_ParseTupleAndKeywords(args, kw, "s|zO&O&O&O&zfffffIz",
                     const_cast<char**>(kwlist), &kind, &name,
                     ToVec3, &d.position, ToVec3, &d.rotation, ToScale, &d.scale,
                     ToVec3, &d.mesh.albedo, &physics, &mass,
                     &d.mesh.metallic, &d.mesh.roughness,
-                    &d.physics.restitution, &d.physics.friction, &parent)) {
+                    &d.physics.restitution, &d.physics.friction, &parent, &material)) {
                 return nullptr;
             }
             ISceneSystem* scene = SceneOrError();
@@ -132,6 +133,7 @@ namespace RiftCore {
                 return nullptr;
             }
             if (name && *name) d.name = name;
+            if (material && *material) d.mesh.materialName = material;
             d.parentID = parent;
             SceneUtil::SetPhysicsMode(d, physics, mass);
             auto r = scene->CreateNode(d);
@@ -284,16 +286,17 @@ namespace RiftCore {
         }
 
         PyObject* py_set_material(PyObject*, PyObject* args, PyObject* kw) {
-            static const char* kwlist[] = { "id", "metallic", "roughness", nullptr };
-            unsigned int id = 0; f32 metallic = -1.0f, roughness = -1.0f;
-            if (!PyArg_ParseTupleAndKeywords(args, kw, "I|ff", const_cast<char**>(kwlist),
-                    &id, &metallic, &roughness)) return nullptr;
+            static const char* kwlist[] = { "id", "metallic", "roughness", "name", nullptr };
+            unsigned int id = 0; f32 metallic = -1.0f, roughness = -1.0f; const char* matName = nullptr;
+            if (!PyArg_ParseTupleAndKeywords(args, kw, "I|ffz", const_cast<char**>(kwlist),
+                    &id, &metallic, &roughness, &matName)) return nullptr;
             ISceneSystem* scene = SceneOrError();
             if (!scene || !NodeOrError(scene, id)) return nullptr;
             SceneNodeDesc d;
             scene->GetNodeDesc(id, d);
             if (metallic  >= 0.0f) d.mesh.metallic  = metallic;
             if (roughness >= 0.0f) d.mesh.roughness = roughness;
+            if (matName) d.mesh.materialName = matName;
             scene->UpdateNode(id, d);
             Py_RETURN_NONE;
         }
@@ -471,9 +474,10 @@ namespace RiftCore {
             { "spawn", RC_KW(py_spawn), METH_VARARGS | METH_KEYWORDS,
               "spawn(kind, name=None, position=(0,0,0), rotation=(0,0,0), scale=1, "
               "color=(.8,.8,.8), physics=None, mass=1, metallic=0, roughness=.5, "
-              "restitution=.4, friction=.5, parent=0) -> id\n"
+              "restitution=.4, friction=.5, parent=0, material=None) -> id\n"
               "kind: a name from models(), an .obj path, 'empty' or 'light'. "
-              "physics: None, 'static' or 'dynamic'." },
+              "physics: None, 'static' or 'dynamic'. material: a name such as 'paint', "
+              "'wood_floor', 'tile', 'brick', 'glass' (used by the Realistic render mode)." },
             { "destroy", py_destroy, METH_VARARGS, "destroy(id): remove a node and its children" },
             { "clear", py_clear, METH_NOARGS, "clear(): remove every node" },
             { "find", py_find, METH_VARARGS, "find(name) -> id or None" },
@@ -491,7 +495,7 @@ namespace RiftCore {
             { "set_scale", py_set_scale, METH_VARARGS, "set_scale(id, s) or set_scale(id, (x, y, z))" },
             { "set_color", py_set_color, METH_VARARGS, "set_color(id, (r, g, b)) with 0..1 values" },
             { "set_material", RC_KW(py_set_material), METH_VARARGS | METH_KEYWORDS,
-              "set_material(id, metallic=None, roughness=None)" },
+              "set_material(id, metallic=None, roughness=None, name=None)" },
             { "set_model", py_set_model, METH_VARARGS, "set_model(id, kind): change the mesh" },
             { "set_physics", RC_KW(py_set_physics), METH_VARARGS | METH_KEYWORDS,
               "set_physics(id, mode, mass=1, restitution=None, friction=None); "

@@ -181,6 +181,7 @@ namespace RiftCore {
         bool argPlay = false;
         for (int i = 1; i < argc; i++) {
             if (std::string(argv[i]) == "--play") argPlay = true;
+            if (std::string(argv[i]) == "--realistic") realistic_ = true;
         }
 
         EngineConfig config;
@@ -360,6 +361,9 @@ namespace RiftCore {
         camera_.SetAspectRatio(static_cast<float>(targetW_) / static_cast<float>(targetH_));
         renderer_->SetClearColor(skyColor_);
         renderer_->SetWireframe(wireframe_);
+        renderer_->SetRealistic(realistic_);
+        renderer_->SetShadows(shadows_);
+        renderer_->SetExposure(exposure_);
         renderer_->BeginFrame(camera_);
         drawer_->Draw(scene_, sun_);
         renderer_->EndFrame();
@@ -853,6 +857,9 @@ namespace RiftCore {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
+            if (ImGui::MenuItem(L(Icon::Shapes, "Solid rendering"), nullptr, !realistic_)) realistic_ = false;
+            if (ImGui::MenuItem(L(Icon::Sun, "Realistic rendering"), nullptr, realistic_)) realistic_ = true;
+            ImGui::Separator();
             ImGui::MenuItem(L(Icon::Wireframe, "Wireframe"), nullptr, &wireframe_);
             ImGui::MenuItem(L(Icon::Grid, "Selection Bounds"), nullptr, &showBounds_);
             ImGui::Separator();
@@ -894,6 +901,10 @@ namespace RiftCore {
         }
         if (ToolButton(Icon::Snap, "Snap", "Snap to grid while dragging", snap_)) snap_ = !snap_;
         if (ToolButton(Icon::Wireframe, "Wire", "Wireframe view", wireframe_)) wireframe_ = !wireframe_;
+        if (ToolButton(Icon::Sun, "Real", realistic_ ? "Render mode: Realistic (click for Solid)"
+                                                     : "Render mode: Solid (click for Realistic)", realistic_)) {
+            realistic_ = !realistic_;
+        }
         if (ToolButton(Icon::Focus, "Focus", "Focus the selection (F)")) FocusSelection();
         ToolSeparator();
         if (ToolButton(Icon::Add, "Add", "Add a model")) ImGui::OpenPopup("##AddMenu");
@@ -1528,6 +1539,18 @@ namespace RiftCore {
 
     void EditorApp::DrawWorld() {
         ImGui::BeginChild("##WorldScroll", ImVec2(0, 0));
+        if (Section(Icon::Viewport, "Rendering")) {
+            int mode = realistic_ ? 1 : 0;
+            static const char* modes[] = { "Solid", "Realistic" };
+            PropertyLabel("Mode");
+            if (ImGui::Combo("##rmode", &mode, modes, 2)) realistic_ = mode == 1;
+            ImGui::BeginDisabled(!realistic_);
+            ImGui::Checkbox("Sun shadows", &shadows_);
+            PropertyLabel("Exposure");
+            ImGui::SliderFloat("##expo", &exposure_, 0.3f, 2.5f, "%.2f");
+            ImGui::EndDisabled();
+            ImGui::Spacing();
+        }
         if (Section(Icon::Sun, "Sun")) {
             PropertyLabel("Direction");
             ImGui::SliderFloat("##az", &sunAzimuth_, 0.0f, 360.0f, "%.0f deg");

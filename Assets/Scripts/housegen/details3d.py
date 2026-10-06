@@ -42,6 +42,20 @@ GOLD = (0.90, 0.72, 0.22)
 MIRROR = (0.70, 0.82, 0.90)
 
 
+MATERIALS = {
+    FRAME: "wood_dark", FRAME_WHITE: "paint", SHADE: "paint", BAND: "paint", COPING: "concrete",
+    COMPOUND: "brick", GATE: "metal", WOOD: "wood", WOOD_DARK: "wood_dark",
+    FABRIC: "fabric", FABRIC_WARM: "fabric", LINEN: "fabric", PILLOW: "fabric", RUG: "fabric",
+    STONE: "marble", STEEL: "metal", CERAMIC: "ceramic", GOLD: "metal", MIRROR: "mirror",
+}
+
+FLOOR_MATERIAL = {
+    "living": "marble", "lounge": "marble", "dining": "marble", "hall": "marble", "stair": "marble",
+    "pooja": "marble", "master": "wood_floor", "bedroom": "wood_floor", "study": "wood_floor",
+    "kitchen": "tile", "bath": "bath_tile", "garage": "concrete",
+}
+
+
 def _outward(d, o):
     """(dx, dy) pointing out of the building for an opening on an external wall, else None."""
     if o.axis == "h":
@@ -175,6 +189,10 @@ def _site(bld, root):
     bld.box("Compound Wall", site, x0, x0 + t, y0, y1, 0, h, COMPOUND)
     bld.box("Compound Wall", site, x1 - t, x1, y0, y1, 0, h, COMPOUND)
 
+    # Road in front of the plot, with a kerb.
+    bld.box("Road", site, x0 - 12000, x1 + 12000, y0 - 7500, y0 - 1200, 0, 25, (0.20, 0.20, 0.21),
+            material="concrete", roughness=0.9)
+    bld.box("Footpath", site, x0 - 12000, x1 + 12000, y0 - 1200, y0, 0, 120, (0.6, 0.6, 0.6), material="paving")
     # Paved apron around the house and planting along the front.
     a = 600
     e = M.EXT_T / 2.0
@@ -392,7 +410,8 @@ def interior(bld, floor_parent, floor):
             continue                                    # open stairwell
         frame = _RoomFrame(bld, d, room, finishes, z)
         frame.box("%s Floor" % room.name, 0, frame.w, 0, frame.d, 0, 18,
-                  FLOOR_FINISH.get(room.kind, (0.8, 0.78, 0.72)), roughness=0.5)
+                  FLOOR_FINISH.get(room.kind, (0.8, 0.78, 0.72)), roughness=0.5,
+                  material=FLOOR_MATERIAL.get(room.kind, "tile"))
         if room.kind in FURNISH:
             grp = rc.spawn("empty", name="%s Furniture" % room.name, parent=furniture)
             FURNISH[room.kind](_RoomFrame(bld, d, room, grp, z))

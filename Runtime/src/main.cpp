@@ -38,6 +38,7 @@ namespace {
         bool        headless = false;
         long        frames   = -1;     // -1 = until the window closes
         bool        help     = false;
+        bool        realistic = false;
     };
 
     Options ParseArgs(int argc, char** argv) {
@@ -50,6 +51,7 @@ namespace {
             else if (a == "--exec")     o.exec   = next();
             else if (a == "--frames")   o.frames = std::atol(next().c_str());
             else if (a == "--headless") o.headless = true;
+            else if (a == "--realistic") o.realistic = true;
             else if (a == "--help" || a == "-h") o.help = true;
         }
         if (o.headless && o.frames < 0) o.frames = 0;
@@ -213,6 +215,7 @@ int main(int argc, char** argv)
                     }
                     camera.SetAspectRatio(static_cast<f32>(w) / static_cast<f32>(h));
                     renderer->SetClearColor({ 0.11f, 0.13f, 0.17f });
+                    renderer->SetRealistic(opt.realistic);
                     renderer->BeginFrame(camera);
                     drawer->Draw(scene, sun);
                     renderer->EndFrame();

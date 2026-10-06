@@ -17,6 +17,13 @@ STEP = (0.70, 0.68, 0.64)
 LAWN = (0.30, 0.48, 0.26)
 PAVING = (0.50, 0.50, 0.52)
 
+# Material (Realistic render mode) for each surface colour.
+MATERIALS = {
+    WALL_EXT: "paint", WALL_INT: "paint", SLAB: "concrete", PLINTH: "paving",
+    ROOF_TILE: "roof_tile", GLASS: "glass", WOOD: "wood", STEP: "concrete",
+    LAWN: "grass", PAVING: "paving",
+}
+
 
 class _Builder:
     def __init__(self, rc, design):
@@ -36,6 +43,9 @@ class _Builder:
         if x1 - x0 <= 0 or y1 - y0 <= 0 or z1 - z0 <= 0:
             return 0
         self.count += 1
+        material = kw.pop("material", None) or MATERIALS.get(color) or details3d.MATERIALS.get(color)
+        if material:
+            kw["material"] = material
         return self.rc.spawn(kind, name=name, parent=parent,
                              position=(self.wx((x0 + x1) / 2.0), (z0 + z1) / 2000.0, self.wz((y0 + y1) / 2.0)),
                              scale=((x1 - x0) / 1000.0, (z1 - z0) / 1000.0, (y1 - y0) / 1000.0),
@@ -119,9 +129,11 @@ class _Builder:
             rh = d.ridge_height / 1000.0
             y = rl / 1000.0 + rh / 2.0
             rc.spawn("wedge", name="Roof Front", parent=roof, position=(0, y, half / 2.0),
-                     scale=(w_m, rh, half), color=ROOF_TILE, roughness=0.8)
+                     scale=(w_m, rh, half), color=ROOF_TILE, roughness=0.8,
+                     material="roof_tile")
             rc.spawn("wedge", name="Roof Rear", parent=roof, position=(0, y, -half / 2.0),
-                     rotation=(0, 180, 0), scale=(w_m, rh, half), color=ROOF_TILE, roughness=0.8)
+                     rotation=(0, 180, 0), scale=(w_m, rh, half), color=ROOF_TILE, roughness=0.8,
+                     material="roof_tile")
             self.count += 2
         else:
             t = M.INT_T
@@ -200,7 +212,8 @@ def build(rc, design, new_scene=True):
     if new_scene:
         rc.new_scene(design.brief.name)
         size = max(design.brief.plot_w, design.brief.plot_d) / 1000.0 + 30.0
-        rc.spawn("plane", name="Ground", scale=(size, 1, size), color=(0.36, 0.40, 0.34), roughness=0.95)
+        rc.spawn("plane", name="Ground", scale=(size, 1, size), color=(0.36, 0.40, 0.34), roughness=0.95,
+                 material="grass")
         rc.spawn("light", name="Sun Light", position=(0, 20, 0), rotation=(42, 30, 0))
     builder = _Builder(rc, design)
     root = builder.build()

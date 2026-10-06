@@ -16,6 +16,8 @@
 
 namespace RiftCore {
 
+    class MaterialLibrary;
+
     class RENDERER_API SceneDrawer {
     public:
         explicit SceneDrawer(RenderSystem* renderer);
@@ -40,6 +42,7 @@ namespace RiftCore {
     private:
         RenderSystem* renderer_ = nullptr;
         std::unordered_map<String, GPUMesh*> meshes_;
+        MaterialLibrary* materials_ = nullptr;   // named materials (Realistic mode)
     };
 
 } // namespace RiftCore

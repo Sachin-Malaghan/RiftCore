@@ -6,6 +6,8 @@ add_library(RiftCore_Renderer SHARED
     src/OBJLoader.cpp
     src/BuiltinModels.cpp
     src/SceneDrawer.cpp
+    src/RealisticPass.cpp
+    src/Materials.cpp
     # HUD.cpp is removed from here
 )
 

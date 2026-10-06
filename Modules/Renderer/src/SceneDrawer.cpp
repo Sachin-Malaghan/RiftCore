@@ -1,6 +1,7 @@
 #include <Renderer/SceneDrawer.h>
 #include <Renderer/Camera.h>
 #include <Renderer/OBJLoader.h>
+#include "Materials.h"
 #include <RiftCore/Common/EulerUtil.h>
 
 #include <algorithm>
@@ -10,7 +11,10 @@ namespace RiftCore {
 
     SceneDrawer::SceneDrawer(RenderSystem* renderer) : renderer_(renderer) {}
 
-    SceneDrawer::~SceneDrawer() { Clear(); }
+    SceneDrawer::~SceneDrawer() {
+        Clear();
+        delete materials_;
+    }
 
     void SceneDrawer::Clear() {
         if (renderer_) {
@@ -111,6 +115,19 @@ namespace RiftCore {
             dc.material.albedo    = it.desc.mesh.albedo;
             dc.material.metallic  = it.desc.mesh.metallic;
             dc.material.roughness = it.desc.mesh.roughness;
+            if (renderer_->IsRealistic() && !it.desc.mesh.materialName.empty()) {
+                if (!materials_) materials_ = new MaterialLibrary(renderer_->GetTextureLoader());
+                if (const MaterialDef* def = materials_->Get(it.desc.mesh.materialName)) {
+                    dc.material.albedoTex = def->albedo;
+                    dc.material.normalTex = def->normal;
+                    dc.material.roughTex  = def->rough;
+                    dc.material.texScale  = def->scale;
+                    dc.material.roughness = def->roughness;
+                    dc.material.metallic  = def->metallic;
+                    dc.material.opacity   = def->opacity;
+                    if (!def->tint) dc.material.albedo = { 1.0f, 1.0f, 1.0f };
+                }
+            }
             dc.transform          = WorldMatrix(scene, it.node);
             renderer_->Submit(dc);
         }
