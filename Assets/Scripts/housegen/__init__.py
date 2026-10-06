@@ -87,13 +87,14 @@ def generate_from_file(prompt_file):
 
 def set_view(roof=True, upper_floors=True):
     """Shows / hides the roof and the upper floors of the generated house in
-    the scene, to look inside the plan in 3D."""
+    the scene, to look into the plan in 3D (a "dollhouse" view)."""
     import riftcore as rc
     for node in rc.nodes():
         name = rc.get(node)["name"]
-        if name == "Roof":
-            rc.set_active(node, bool(roof))
-        elif name in ("First Floor", "Second Floor"):
+        if name in ("Roof", "Roof Slab", "Parapet Coping", "Water Tank", "Tank Stand", "Ridge Cap", "Fascia"):
+            rc.set_active(node, bool(roof) and bool(upper_floors or True))
+        elif name in ("First Floor", "Second Floor", "Floor Slab", "First Floor Details",
+                      "Second Floor Details"):
             rc.set_active(node, bool(upper_floors))
-        elif name == "Roof Slab":
-            rc.set_active(node, bool(roof))
+        elif name in ("Floor Band", "Sunshade", "Window Frame", "Porch Canopy"):
+            rc.set_active(node, True)

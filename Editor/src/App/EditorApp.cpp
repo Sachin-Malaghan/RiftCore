@@ -167,7 +167,7 @@ namespace RiftCore {
         bool haveAssets = Paths::EnterProjectRoot();
 
         std::string argScene, argScript, argSelect, argHouse;
-        int argSheet = 0;
+        int argSheet = 0, argView = 0;
         for (int i = 1; i + 1 < argc; i++) {
             std::string a = argv[i];
             if      (a == "--scene")  argScene  = argv[++i];
@@ -175,6 +175,7 @@ namespace RiftCore {
             else if (a == "--select") argSelect = argv[++i];
             else if (a == "--house")  housePrompt_ = argHouse = argv[++i];
             else if (a == "--sheet")  argSheet = std::atoi(argv[++i]);
+            else if (a == "--view")   argView = std::atoi(argv[++i]);
             else if (a == "--show")   showTabs_ = std::string(",") + argv[++i] + ",";
         }
         bool argPlay = false;
@@ -261,7 +262,7 @@ namespace RiftCore {
         else    NewScene();
         if (scene_->GetNodeCount() == 0 && scenePath_.empty()) NewScene();
         if (!argScript.empty()) RunScript(argScript);
-        if (!argHouse.empty()) { GenerateHouse(); houseSheet_ = argSheet; showDrawings_ = false; }
+        if (!argHouse.empty()) { GenerateHouse(); houseSheet_ = argSheet; showDrawings_ = false; SetHouseView(argView); }
         if (!argSelect.empty()) {
             if (ISceneNode* n = scene_->FindNode(argSelect)) Select(n->GetID());
         }

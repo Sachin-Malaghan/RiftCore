@@ -38,6 +38,27 @@ cd Assets/Scripts
 python -m housegen "modern 3 bedroom two storey house with garage" --out ../../Output/Test
 ```
 
+## The 3D model
+
+The scene is a full architectural model, grouped in the Outliner by floor:
+
+* **Exterior** - walls with real openings, window frames, sunshades over every
+  window and door, entrance porch with canopy and posts, projecting bands at
+  each slab, parapet with coping and a roof water tank (or gable roof with
+  ridge and fascia), compound wall with pedestrian and vehicle gates, paved
+  apron, entrance path, driveway, lawn, trees and shrubs.
+* **Interior** - a floor finish per room, door frames with the internal doors
+  standing open, the dog-leg stair, and furniture and fixtures by room type:
+  beds with side tables and wardrobes, sofa / coffee table / TV unit, dining
+  table and chairs, kitchen counters with sink, hob, hood and refrigerator,
+  WC / vanity / mirror / shower, pooja altar, study desk and bookshelf, and a
+  car in the garage.
+
+The **3D view** buttons in the House AI tab set the camera: **Exterior** (from
+the road), **Dollhouse** (roof and upper floors hidden, looking down into the
+ground floor) and **Inside** (eye level in the living room; fly with the right
+mouse button + W A S D).
+
 ## What the prompt understands
 
 | | Examples |
@@ -96,7 +117,7 @@ replacement for Revit or for a design team:
 * The prompt is read by rules, not by a language model: it picks up the
   items in the table above and ignores the rest.
 * One plan type (central hall, rectangular footprint). No L-shapes, courtyards,
-  balconies, attached bathrooms or furniture yet.
+  balconies or attached bathrooms yet. Furniture is simple block models placed by rule.
 * Structure is indicative: standard column, footing, beam and slab sizes,
   with no load or soil calculation. Quantities are preliminary.
 * Vastu guidelines are traditional preferences, not regulations, and local

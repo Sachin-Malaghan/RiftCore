@@ -4,6 +4,7 @@ Metres, Y up. The front of the house faces +Z (towards the default camera),
 plan X runs along world X and the plan is centred on the origin.
 """
 from . import model as M
+from . import details3d
 
 WALL_EXT = (0.93, 0.90, 0.84)
 WALL_INT = (0.96, 0.95, 0.92)
@@ -106,6 +107,7 @@ class _Builder:
                 self.stairs(grp, z)
             else:
                 self.box(name, grp, -e, d.W + e, -e, d.D + e, top, z + d.H, SLAB)
+            details3d.interior(self, grp, f)
 
         # ---- roof ----
         roof = rc.spawn("empty", name="Roof", parent=root)
@@ -128,6 +130,7 @@ class _Builder:
             self.box("Parapet", roof, -e, d.W + e, d.D + e - t, d.D + e, p0, p1, WALL_EXT)
             self.box("Parapet", roof, -e, -e + t, -e, d.D + e, p0, p1, WALL_EXT)
             self.box("Parapet", roof, d.W + e - t, d.W + e, -e, d.D + e, p0, p1, WALL_EXT)
+        details3d.exterior(self, root)
         return root
 
     def joinery(self, parent, w, o, z):
@@ -135,6 +138,9 @@ class _Builder:
         if o.kind == "opening":
             return
         zb, zt = z + o.sill, z + o.sill + o.height
+        if o.kind == "door":
+            details3d.door_leaf(self, parent, w, o, z, w.exterior)
+            return
         if o.kind == "window":
             thin = 20
             if w.axis == "h":

@@ -72,6 +72,7 @@ namespace RiftCore {
         void DrawDrawings();
         void GenerateHouse();
         bool LoadHouseDesign();
+        void SetHouseView(int preset);   // 0 exterior, 1 dollhouse, 2 inside
 
         // ── Viewport helpers ────────────────────────────────
         void ResizeTarget(int w, int h);
@@ -196,6 +197,7 @@ namespace RiftCore {
         int   houseSheet_ = 0;
         float houseZoom_ = 1.0f, housePanX_ = 0.0f, housePanY_ = 0.0f;
         float houseW_ = 0.0f, houseD_ = 0.0f, houseTop_ = 0.0f;
+        float houseLivingX_ = 0.0f, houseLivingZ_ = 0.0f;   // living room centre, world metres
         bool  houseRoof_ = true, houseUpper_ = true;
         bool  showDrawings_ = false;        // bring the 2D Drawings tab forward once
 

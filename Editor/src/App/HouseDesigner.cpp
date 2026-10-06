@@ -102,12 +102,34 @@ namespace RiftCore {
         selected_ = INVALID_NODE;
         houseRoof_ = houseUpper_ = true;
         if (LoadHouseDesign()) {
-            // Stand back far enough to see the whole house from the front.
-            float depth = houseD_ / 1000.0f, top = houseTop_ / 1000.0f;
-            camera_.SetPosition({ houseW_ / 2000.0f + 4.0f, top + 5.0f, depth / 2.0f + houseW_ / 1000.0f + 6.0f });
+            SetHouseView(0);
             showDrawings_ = true;
         }
         UpdateTitle();
+    }
+
+    void EditorApp::SetHouseView(int preset) {
+        if (houseSheets_.empty()) return;
+        bool py = scripting_ && scripting_->IsAvailable();
+        float w = houseW_ / 1000.0f, d = houseD_ / 1000.0f, top = houseTop_ / 1000.0f;
+        houseRoof_ = houseUpper_ = (preset != 1);
+        if (py) {
+            scripting_->ExecuteString(preset == 1
+                ? "import housegen\nhousegen.set_view(roof=False, upper_floors=False)\n"
+                : "import housegen\nhousegen.set_view(roof=True, upper_floors=True)\n");
+            PumpScriptOutput();
+        }
+        if (preset == 0) {            // from the road, front corner
+            camera_.SetPosition({ w * 0.5f + 5.0f, top * 0.75f + 2.0f, d * 0.5f + w + 5.0f });
+            camera_.SetTarget({ 0.0f, top * 0.42f, 0.0f });
+        } else if (preset == 1) {     // looking down into the ground floor
+            float h = std::max(w, d) * 1.05f + 3.0f;
+            camera_.SetPosition({ 0.0f, h, d * 0.5f + 5.0f });
+            camera_.SetTarget({ 0.0f, 0.5f, -0.6f });
+        } else {                      // standing in the living room, eye level
+            camera_.SetPosition({ houseLivingX_ - 1.2f, 0.45f + 1.6f, houseLivingZ_ + 1.0f });
+            camera_.SetTarget({ houseLivingX_ + 1.5f, 1.45f, houseLivingZ_ - 3.0f });
+        }
     }
 
     bool EditorApp::LoadHouseDesign() {
@@ -128,6 +150,13 @@ namespace RiftCore {
             houseD_   = root.value("D", 0.0f);
             houseTop_ = root.value("top_level", 0.0f);
 
+            houseLivingX_ = houseLivingZ_ = 0.0f;
+            for (auto& r : root["rooms"]) {
+                if (r.value("kind", "") == "living" && r.value("floor", 0) == 0) {
+                    houseLivingX_ = (r.value("x", 0.0f) + r.value("w", 0.0f) * 0.5f - houseW_ * 0.5f) / 1000.0f;
+                    houseLivingZ_ = (houseD_ * 0.5f - (r.value("y", 0.0f) + r.value("d", 0.0f) * 0.5f)) / 1000.0f;
+                }
+            }
             const json& b = root["brief"];
             houseInfo_.push_back({ "Project", b.value("name", "House") });
             houseInfo_.push_back({ "Size", std::to_string(root.value("W", 0)) + " x " +
@@ -273,6 +302,12 @@ namespace RiftCore {
                 ImGui::Spacing();
             }
             if (Section(Icon::Viewport, "3D view")) {
+                float bw = (ImGui::GetContentRegionAvail().x - 12.0f) / 3.0f;
+                if (ImGui::Button("Exterior", ImVec2(bw, 0)))  SetHouseView(0);
+                ImGui::SameLine(0, 6);
+                if (ImGui::Button("Dollhouse", ImVec2(bw, 0))) SetHouseView(1);
+                ImGui::SameLine(0, 6);
+                if (ImGui::Button("Inside", ImVec2(bw, 0)))    SetHouseView(2);
                 bool changed = ImGui::Checkbox("Show roof", &houseRoof_);
                 changed |= ImGui::Checkbox("Show upper floors", &houseUpper_);
                 if (changed && py) {

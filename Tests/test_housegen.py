@@ -91,5 +91,8 @@ for i, prompt in enumerate(PROMPTS):
     # 3D scene.
     assert result["root"] and rc.node_count() > 60, "%s scene not built" % tag
     assert rc.find("Roof") and rc.find("Ground Floor") and rc.find("Plinth"), tag
+    for part in ("Exterior Details", "Compound", "Furniture", "Floor Finishes", "Porch Canopy"):
+        assert rc.find(part), "%s 3D model has no %s" % (tag, part)
+    assert rc.node_count() > 200, "%s only %d nodes" % (tag, rc.node_count())
 
 print("HOUSEGEN PASSED: %d designs" % len(PROMPTS))

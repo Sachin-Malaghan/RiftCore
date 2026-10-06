@@ -79,7 +79,12 @@ void main() {
         : vColor;
 
     vec3 baseColor = texColor * uAlbedo;
-    vec3 ambient   = uAmbient * baseColor;
+    // Sky / ground ambient plus a soft fill from the opposite side, so faces
+    // turned away from the sun (and interiors) keep their shape and colour.
+    float hemi     = 0.5 + 0.5 * N.y;
+    vec3  Lfill    = normalize(vec3(L.x, -0.35, L.z) * vec3(-1.0, 1.0, -1.0));
+    float fill     = max(dot(N, Lfill), 0.0) * 0.22;
+    vec3 ambient   = (uAmbient * mix(0.55, 1.0, hemi) + vec3(fill)) * baseColor;
     vec3 diffuse   = diff * uLightColor
                      * uLightIntensity * baseColor;
     vec3 specular  = spec * uLightColor
@@ -283,7 +288,7 @@ void main() {
 
         // Ambient light
         glPipe->SetUniformVec3("uAmbient",
-            0.08f, 0.08f, 0.12f);
+            0.46f, 0.47f, 0.52f);
 
         // Draw all submitted objects
         for (auto& dc : drawQueue_) {
