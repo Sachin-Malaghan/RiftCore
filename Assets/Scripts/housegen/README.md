@@ -1,0 +1,106 @@
+# housegen - automated house design
+
+Type a brief, get a coordinated house design: dimensioned drawings, schedules,
+quantities and the 3D model, all generated from one building model.
+
+## In the editor
+
+1. Open the **House AI** tab (left panel).
+2. Describe the house, for example
+   `2BHK house with 2 floors, vastu compliant, north facing`
+3. Press **Generate design**.
+
+The 3D house is built in the scene, the **2D Drawings** tab (next to the 3D
+viewport) shows every sheet - drag to pan, wheel to zoom - and the files are
+written to `Output/<project name>/`. "Show roof" / "Show upper floors" let you
+look into the plan in 3D.
+
+## From Python
+
+```python
+import housegen
+
+result = housegen.generate("3BHK east facing vastu house, G+1, car parking")
+design = result["design"]          # the building model
+print(design.W, design.D, [r.name for r in design.rooms])
+
+# Or fill in the brief yourself:
+brief = housegen.Brief(bedrooms=3, bathrooms=2, floors=2, garage=True,
+                       plot_w=12000, plot_d=18000, facing="east", vastu=True,
+                       style="traditional")
+housegen.generate(brief, out_dir="Output/MyHouse")
+```
+
+Without the engine (drawings and report only):
+
+```
+cd Assets/Scripts
+python -m housegen "modern 3 bedroom two storey house with garage" --out ../../Output/Test
+```
+
+## What the prompt understands
+
+| | Examples |
+|---|---|
+| Bedrooms / bathrooms | `3 bedroom`, `2BHK`, `two bathrooms` |
+| Storeys | `two storey`, `G+1`, `duplex`, `single storey`, `bungalow` |
+| Plot | `12 x 18 m plot`, `30 x 40 ft` |
+| Built-up area | `1200 sq ft`, `140 sqm` (per floor) |
+| Facing | `north facing`, `east-facing` |
+| Vastu | `vastu` - compass zoning plus a compliance check |
+| Extras | `garage` / `car parking`, `study` / `office`, `pooja` |
+| Roof | `modern` / `flat roof`, `traditional` / `gable` / `pitched` |
+| Floor height | `3.2 m floor height` |
+
+Anything not mentioned keeps a default, and every assumption or compromise
+(reduced setbacks, a storey added to fit a small plot, ...) is listed under
+"Design notes" in the report.
+
+## What you get (`Output/<project>/`)
+
+| File | Contents |
+|---|---|
+| `plan_0.svg`, `plan_1.svg`, ... | floor plans: walls, doors with swings, windows, columns, stair, room names with clear sizes and areas, dimension chains, section mark, north arrow |
+| `elev_front / rear / left / right.svg` | elevations with openings, roof and level markers |
+| `section.svg` | section A-A: footings, plinth, slabs, walls, roof, levels |
+| `structure.svg` | column grid, footings and plinth beams with dimensions |
+| `site.svg` | plot, setbacks, building position, coverage |
+| `drawings.dxf` | all sheets in one layered DXF (millimetres) for AutoCAD, Revit, BricsCAD, LibreCAD |
+| `report.md` | room schedule, Vastu check, door / window schedule, stair data, structure summary, preliminary quantities, design notes |
+| `design.json` | the full building model and every sheet as primitives |
+
+All dimensions are exact millimetres taken from the model, on wall centre
+lines; room labels give the clear (inside) size.
+
+## How it designs
+
+Rooms are arranged in three bands - front rooms, a central hall, rear rooms -
+so every wall runs continuously through all floors and the structure stacks.
+Room widths follow target areas; band depths follow the garage and stair
+requirements. Doors open off the hall, windows go on every external wall of
+every room, columns stand at room corners on the four long wall lines, and
+the dog-leg stair is sized from the floor height (risers of 175 mm or less).
+
+With `vastu`, rooms are zoned by compass from the plot's facing: pooja
+north-east, kitchen south-east, master bedroom south-west, toilets
+north-west, stair south-west, entrance on the favourable half of the front.
+The report states for each guideline whether the result meets it. On south
+and west facing plots the living room is still at the front, so that one
+guideline is reported as a note.
+
+## Limits
+
+This is a parametric generator for rectangular houses of 1-3 storeys, not a
+replacement for Revit or for a design team:
+
+* The prompt is read by rules, not by a language model: it picks up the
+  items in the table above and ignores the rest.
+* One plan type (central hall, rectangular footprint). No L-shapes, courtyards,
+  balconies, attached bathrooms or furniture yet.
+* Structure is indicative: standard column, footing, beam and slab sizes,
+  with no load or soil calculation. Quantities are preliminary.
+* Vastu guidelines are traditional preferences, not regulations, and local
+  building rules (setbacks, coverage, heights) are not checked.
+
+A licensed architect and structural engineer must check the scheme before
+anything is built from it.

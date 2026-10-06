@@ -20,4 +20,11 @@ set_tests_properties(scripting_and_physics PROPERTIES
     PASS_REGULAR_EXPRESSION "TEST PASSED"
     FAIL_REGULAR_EXPRESSION "Traceback;Python is not available")
 
-message(STATUS "[Tests] 2 headless tests registered (ctest).")
+add_test(NAME house_designer
+    COMMAND RiftCoreRuntime --headless --scene "" --script Tests/test_housegen.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(house_designer PROPERTIES
+    PASS_REGULAR_EXPRESSION "HOUSEGEN PASSED"
+    FAIL_REGULAR_EXPRESSION "Traceback;Python is not available")
+
+message(STATUS "[Tests] 3 headless tests registered (ctest).")

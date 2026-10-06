@@ -75,6 +75,7 @@ namespace RiftCore::Ed {
         inline const char* Gravity    = u8"\uE74B";
         inline const char* Sun        = u8"\uE706";
         inline const char* Exit       = u8"\uE7E8";
+        inline const char* Home       = u8"\uE80F";
         inline const char* Model      = u8"\uE7B8";
     }
 

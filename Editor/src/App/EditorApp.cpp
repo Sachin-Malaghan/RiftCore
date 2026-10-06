@@ -166,12 +166,15 @@ namespace RiftCore {
     bool EditorApp::Init(int argc, char** argv) {
         bool haveAssets = Paths::EnterProjectRoot();
 
-        std::string argScene, argScript, argSelect;
+        std::string argScene, argScript, argSelect, argHouse;
+        int argSheet = 0;
         for (int i = 1; i + 1 < argc; i++) {
             std::string a = argv[i];
             if      (a == "--scene")  argScene  = argv[++i];
             else if (a == "--script") argScript = argv[++i];
             else if (a == "--select") argSelect = argv[++i];
+            else if (a == "--house")  housePrompt_ = argHouse = argv[++i];
+            else if (a == "--sheet")  argSheet = std::atoi(argv[++i]);
             else if (a == "--show")   showTabs_ = std::string(",") + argv[++i] + ",";
         }
         bool argPlay = false;
@@ -243,6 +246,7 @@ namespace RiftCore {
         sun_.intensity = 1.8f;
 
         pythonSource_ = kDefaultScript;
+        LoadHouseDesign();      // drawings of the last generated house, if any
 
         Log(LogLevel::Info, "RiftCore Editor ready.");
         if (!haveAssets) Log(LogLevel::Warning, "No Assets folder found next to the executable.");
@@ -257,6 +261,7 @@ namespace RiftCore {
         else    NewScene();
         if (scene_->GetNodeCount() == 0 && scenePath_.empty()) NewScene();
         if (!argScript.empty()) RunScript(argScript);
+        if (!argHouse.empty()) { GenerateHouse(); houseSheet_ = argSheet; showDrawings_ = false; }
         if (!argSelect.empty()) {
             if (ISceneNode* n = scene_->FindNode(argSelect)) Select(n->GetID());
         }
@@ -729,6 +734,8 @@ namespace RiftCore {
                 if (ImGui::BeginTabItem(L(Icon::Outliner, "Outliner"))) { DrawOutliner(); ImGui::EndTabItem(); }
                 if (ImGui::BeginTabItem(L(Icon::Place, "Place"), nullptr,
                         WantTab("place") ? ImGuiTabItemFlags_SetSelected : 0)) { DrawPlace(); ImGui::EndTabItem(); }
+                if (ImGui::BeginTabItem(L(Icon::Home, "House AI"), nullptr,
+                        WantTab("house") ? ImGuiTabItemFlags_SetSelected : 0)) { DrawHouseDesigner(); ImGui::EndTabItem(); }
                 ImGui::EndTabBar();
             }
         }
@@ -741,7 +748,16 @@ namespace RiftCore {
         ImGui::BeginGroup();
         {
             float viewH = bodyH - bottomH_ - gap;
-            if (BeginPanel("##Viewport", ImVec2(centerW, viewH), false)) DrawViewport();
+            if (BeginPanel("##Viewport", ImVec2(centerW, viewH), false)) {
+                if (ImGui::BeginTabBar("##ViewTabs")) {
+                    if (ImGui::BeginTabItem(L(Icon::Viewport, "3D Viewport"))) { DrawViewport(); ImGui::EndTabItem(); }
+                    bool want = showDrawings_ || WantTab("drawings");
+                    showDrawings_ = false;
+                    if (ImGui::BeginTabItem(L(Icon::Image, "2D Drawings"), nullptr,
+                            want ? ImGuiTabItemFlags_SetSelected : 0)) { DrawDrawings(); ImGui::EndTabItem(); }
+                    ImGui::EndTabBar();
+                }
+            }
             EndPanel();
             Splitter("##SplitB", false, gap, &bottomH_, -1.0f, 120.0f, bodyH - 160.0f, centerW);
             if (BeginPanel("##Bottom", ImVec2(centerW, bottomH_))) {

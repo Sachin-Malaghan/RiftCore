@@ -45,7 +45,7 @@ folder in the antivirus.
 
 ```
  menu bar / toolbar (file, undo, tools, snap, play - pause - stop - step)
- [Outliner | Place]   [ Viewport                        ]   [Details | World | Stats]
+ [Outliner | Place | House AI]  [3D Viewport | 2D Drawings]  [Details | World | Stats]
                       [Content Browser | Console | Python]
  status bar
 ```
@@ -78,6 +78,28 @@ as it was. Every edit is undoable (Ctrl+Z / Ctrl+Y).
 | F5 | play / stop |
 
 Command line: `RiftCoreEditor [--scene file.json] [--script file.py] [--select "Node"] [--play]`.
+
+## House AI - automated house design
+
+Open the **House AI** tab, type a brief such as
+
+    2BHK house with 2 floors, vastu compliant, north facing
+
+and press **Generate design**. One building model is designed from the prompt
+and everything else is produced from it:
+
+* the 3D house in the scene (walls with real openings, slabs, stair, roof, plot),
+* dimensioned floor plans, four elevations, section A-A, a foundation / column
+  layout and a site plan - shown in the **2D Drawings** tab and written as SVG
+  plus one layered DXF (millimetres) for AutoCAD / Revit,
+* a report with room, door / window and quantity schedules, and a Vastu check
+  when the prompt asks for Vastu.
+
+It is scriptable (`import housegen; housegen.generate("...")`) and runs
+without the editor too. What the prompt understands, the outputs and the
+limits are in [Assets/Scripts/housegen/README.md](Assets/Scripts/housegen/README.md).
+It is a parametric generator for rectangular 1-3 storey houses, not a Revit
+replacement, and its structure and quantities are preliminary.
 
 ## Built-in models
 
@@ -123,8 +145,10 @@ Build\bin\RiftCoreRuntime.exe --headless --frames 600 --script my_sim.py
 ctest --test-dir Build -C Release --output-on-failure
 ```
 
-Two headless tests: the engine boots and steps a scene, and a Python script
-exercises the scripting API, scene save / load and the physics result.
+Three headless tests: the engine boots and steps a scene; a Python script
+exercises the scripting API, scene save / load and the physics result; and
+the house designer produces eight different houses that are checked for
+consistent geometry, complete deliverables and a built 3D scene.
 
 ## Architecture
 

@@ -5,7 +5,8 @@
 #include <iostream>
 
 // Options: --scene <file.json>  --script <file.py>  --select <node name>  --play
-//          --show <tab>[,<tab>...]   (place, world, stats, console, python)
+//          --show <tab>[,<tab>...]   (place, house, drawings, world, stats, console, python)
+//          --house "<prompt>"        design a house on start-up;  --sheet <n>  drawing to show
 int main(int argc, char** argv)
 {
     RiftCore::EditorApp app;

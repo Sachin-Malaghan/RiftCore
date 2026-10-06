@@ -8,6 +8,7 @@ add_executable(RiftCoreEditor
     src/App/EditorApp.cpp
     src/App/EditorApp.h
     src/App/EditorStyle.cpp
+    src/App/HouseDesigner.cpp
     src/App/EditorStyle.h
 )
 
@@ -34,12 +35,13 @@ target_link_libraries(RiftCoreEditor
     PRIVATE RiftCore_Scene
     PRIVATE imgui
     PRIVATE imguizmo
+    PRIVATE nlohmann_json
     PRIVATE glad::glad
     PRIVATE glfw
     PRIVATE OpenGL::GL
 )
 if(WIN32)
-    target_link_libraries(RiftCoreEditor PRIVATE comdlg32)
+    target_link_libraries(RiftCoreEditor PRIVATE comdlg32 shell32)
 endif()
 
 # Loaded at run time (not linked): make sure it is built with the editor.

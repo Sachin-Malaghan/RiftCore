@@ -80,6 +80,13 @@ namespace RiftCore {
 
         scene->ForEachNode([&](ISceneNode* node) {
             if (!node->IsActive()) return;
+            int guard = 0;
+            for (SceneNodeID pid = node->GetParentID(); pid != INVALID_NODE && guard++ < 64;) {
+                ISceneNode* parent = scene->GetNode(pid);
+                if (!parent) break;
+                if (!parent->IsActive()) return;      // hidden with its parent
+                pid = parent->GetParentID();
+            }
             SceneNodeDesc d;
             if (!scene->GetNodeDesc(node->GetID(), d)) return;
 

@@ -64,6 +64,8 @@ playing, and pressing Stop restores the scene to how it was before Play.
 
 ## Samples
 
+* `housegen/` - automated house design from a prompt (see its README).
+
 * `build_showcase.py` - builds the default scene with every model.
 * `demo_dominoes.py` - a domino chain reaction.
 * `demo_rain.py` - spawns and recycles falling bodies from a per-frame callback.

@@ -1,4 +1,4 @@
-﻿# Build output
+# Build output
 Build/
 bin/
 lib/
@@ -51,3 +51,5 @@ Build/
 imgui.ini
 __pycache__/
 *.pyc
+# Generated house designs
+Output/

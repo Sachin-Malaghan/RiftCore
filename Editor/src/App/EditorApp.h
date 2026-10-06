@@ -68,6 +68,10 @@ namespace RiftCore {
         void DrawContent();
         void DrawConsole();
         void DrawPython();
+        void DrawHouseDesigner();
+        void DrawDrawings();
+        void GenerateHouse();
+        bool LoadHouseDesign();
 
         // ── Viewport helpers ────────────────────────────────
         void ResizeTarget(int w, int h);
@@ -170,6 +174,30 @@ namespace RiftCore {
         bool        focusPython_ = false;
         std::string showTabs_;                  // tabs to bring forward once (--show)
         bool        WantTab(const char* name);
+
+        // ── House AI (see HouseDesigner.cpp) ─────────────────
+        struct HousePrim {
+            int   kind = 0;                 // 0 line, 1 rect, 2 poly, 3 arc, 4 text
+            float v[5] = {};
+            std::vector<float> pts;
+            std::string text, layer;
+            bool  fill = false;
+            int   anchor = 1;
+        };
+        struct HouseSheet {
+            std::string title;
+            float bounds[4] = {};
+            std::vector<HousePrim> prims;
+        };
+        std::string housePrompt_ = "2BHK house with 2 floors, vastu compliant, north facing";
+        std::vector<HouseSheet> houseSheets_;
+        std::vector<std::pair<std::string, std::string>> houseInfo_, houseVastu_;
+        std::string houseDir_;
+        int   houseSheet_ = 0;
+        float houseZoom_ = 1.0f, housePanX_ = 0.0f, housePanY_ = 0.0f;
+        float houseW_ = 0.0f, houseD_ = 0.0f, houseTop_ = 0.0f;
+        bool  houseRoof_ = true, houseUpper_ = true;
+        bool  showDrawings_ = false;        // bring the 2D Drawings tab forward once
 
         float fpsHistory_[120] = {};
         int   fpsOffset_ = 0;
