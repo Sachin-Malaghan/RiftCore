@@ -5,11 +5,6 @@
 #include <ctime>
 #include <iomanip>
 
-
-
-
-
-
 // Undefine Windows FormatMessage macro if it exists
 // This conflicts with our Logger::FormatMessage method name
 #ifdef FormatMessage
