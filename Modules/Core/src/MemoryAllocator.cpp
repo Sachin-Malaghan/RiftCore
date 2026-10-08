@@ -5,6 +5,18 @@
 #include <iostream>
 #include <sstream>
 
+
+
+
+
+
+
+
+
+
+
+
+
 namespace RiftCore {
 
     // Align a pointer up to the given alignment
