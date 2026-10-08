@@ -17,6 +17,12 @@
         #undef FormatMessage
     #endif
 #endif
+
+
+
+
+
+
 namespace RiftCore {
 
     static void SetWindowsConsoleColor(LogLevel level) {
