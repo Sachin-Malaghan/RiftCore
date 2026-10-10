@@ -10,6 +10,8 @@
 
 
 
+
+
 // Undefine Windows FormatMessage macro if it exists
 // This conflicts with our Logger::FormatMessage method name
 #ifdef FormatMessage
@@ -22,6 +24,7 @@
         #undef FormatMessage
     #endif
 #endif
+
 namespace RiftCore {
 
     static void SetWindowsConsoleColor(LogLevel level) {

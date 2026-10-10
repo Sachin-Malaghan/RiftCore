@@ -6,7 +6,6 @@
 
 
 
-
 namespace RiftCore {
     EventBus::EventBus()  = default;
     EventBus::~EventBus() = default;
