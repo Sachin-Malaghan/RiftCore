@@ -29,7 +29,7 @@ def _slug(name):
     return re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_") or "House"
 
 
-def generate(prompt_or_brief, out_dir=None, build_scene=True, new_scene=True):
+def generate(prompt_or_brief, out_dir=None, build_scene=True, new_scene=True, units=None):
     """Designs a house and writes every deliverable.
 
     prompt_or_brief: a text prompt, a Brief, or a dict of Brief fields.
@@ -41,6 +41,10 @@ def generate(prompt_or_brief, out_dir=None, build_scene=True, new_scene=True):
         brief = Brief.from_dict(prompt_or_brief)
     else:
         brief = parse_prompt(str(prompt_or_brief))
+
+    if units:
+        from . import units as _units
+        brief.units = _units.normalise(units)
 
     design = design_house(brief)
     sheets = drafting.all_sheets(design)
@@ -79,10 +83,11 @@ def generate(prompt_or_brief, out_dir=None, build_scene=True, new_scene=True):
     return {"design": design, "sheets": sheets, "out_dir": out_dir, "root": root, "summary": summary}
 
 
-def generate_from_file(prompt_file):
-    """Editor entry point: the prompt is passed through a text file."""
+def generate_from_file(prompt_file, units=None):
+    """Editor entry point: the prompt is passed through a text file. `units`
+    overrides the unit system read from the prompt ("mm", "cm", "m", "in", "ft-in")."""
     with open(prompt_file, "r", encoding="utf-8") as f:
-        return generate(f.read())
+        return generate(f.read(), units=units)
 
 
 def set_view(roof=True, upper_floors=True):

@@ -29,6 +29,7 @@ class Brief:
     pooja: bool = False
     facing: str = "north"          # compass direction the front (road side) faces
     vastu: bool = False            # zone the rooms by Vastu Shastra guidelines
+    units: str = "mm"              # how sizes are written: mm, cm, m, in, ft-in (see units.py)
     style: str = "modern"          # "modern" (flat roof + parapet) or "traditional" (gable roof)
     plot_w: int = 0                # 0 = not given: the plot is sized around the house
     plot_d: int = 0
@@ -132,6 +133,19 @@ def parse_prompt(prompt):
     b.vastu = bool(re.search(r"vastu|vaastu|vasthu", t))
     if b.vastu:
         b.pooja = True
+
+    # Units for the drawings: stated explicitly, else imperial when the plot was given in feet.
+    m = re.search(r"(?:units?|dimensions?|drawings?)\s*(?:in|:|=)?\s*(mm|millimet\w+|cm|centimet\w+|"
+                  r"met(?:re|er)s?|inch(?:es)?|feet|ft|imperial|metric)\b", t)
+    if m:
+        from . import units as _u
+        word = m.group(1)
+        word = "mm" if word.startswith("millim") else "cm" if word.startswith("centim") else word
+        b.units = _u.normalise(word)
+    elif re.search(r"\bimperial\b|feet and inches|ft-in", t):
+        b.units = "ft-in"
+    elif re.search(r"\d\s*(ft|feet|foot|')\s*(x|by|\*|plot)|x\s*\d+(\.\d+)?\s*(ft|feet|foot)\b|sq\.?\s*ft|sqft", t):
+        b.units = "ft-in"
 
     b.garage = bool(re.search(r"garage|car\s*park|carport|parking", t))
     b.study = bool(re.search(r"study|office|library|work\s*room", t))

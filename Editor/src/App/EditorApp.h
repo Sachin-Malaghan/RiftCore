@@ -81,6 +81,8 @@ namespace RiftCore {
         void DrawGizmo(float x, float y, float w, float h);
         void DrawSelectionBox(float x, float y, float w, float h);
         void FocusSelection();
+        Vec3 OrbitPivot();
+        void SetStandardView(int view);   // 0 top, 1 front, 2 right, 3 left, 4 back, 5 isometric
 
         // ── Scene commands ──────────────────────────────────
         SceneNodeID Spawn(const std::string& kind, const char* physics = nullptr);
@@ -129,7 +131,11 @@ namespace RiftCore {
         float  camYaw_ = -90.0f, camPitch_ = -20.0f;
         float  camSpeed_ = 10.0f, camFov_ = 60.0f;
         bool   wireframe_ = false;
-        bool   realistic_ = false;      // render mode: Solid / Realistic
+        int    visualStyle_ = 0;        // 0 Solid, 1 Realistic, 2 Shaded + edges, 3 Hidden line
+        bool   ortho_ = false;          // parallel projection
+        float  orthoHeight_ = 20.0f;    // metres shown top to bottom in a parallel view
+        Vec3   pivot_ = { 0.0f, 1.0f, 0.0f };   // orbit centre
+        bool   orbiting_ = false, panning_ = false;
         bool   shadows_ = true;
         float  exposure_ = 1.0f;
         bool   showBounds_ = true;
@@ -202,6 +208,7 @@ namespace RiftCore {
         float houseW_ = 0.0f, houseD_ = 0.0f, houseTop_ = 0.0f;
         float houseLivingX_ = 0.0f, houseLivingZ_ = 0.0f;   // living room centre, world metres
         bool  houseRoof_ = true, houseUpper_ = true;
+        int   houseUnits_ = 0;              // 0 = as the prompt says, then mm, cm, m, in, ft-in
         bool  showDrawings_ = false;        // bring the 2D Drawings tab forward once
 
         float fpsHistory_[120] = {};

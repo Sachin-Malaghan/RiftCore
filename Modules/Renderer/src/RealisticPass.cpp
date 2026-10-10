@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <map>
+#include <tuple>
 
 namespace RiftCore {
 
@@ -72,6 +74,7 @@ uniform vec3  uSkyColor;
 uniform vec3  uHorizonColor;
 uniform vec3  uGroundColor;
 uniform float uExposure;
+uniform int   uStyle;         // 0 realistic, 1 shaded, 2 hidden line
 
 const float PI = 3.14159265;
 
@@ -150,6 +153,16 @@ void main() {
     }
     rough = clamp(rough, 0.05, 1.0);
 
+    if (uStyle != 0) {
+        // CAD styles: even, shadowless light from the sun side so every face reads.
+        float l = max(dot(N, normalize(-uSunDir)), 0.0);
+        float side = 0.5 + 0.5 * N.y;
+        vec3 c = uStyle == 2 ? vec3(0.90 + 0.10 * l)
+                             : pow(base, vec3(1.0 / 2.2)) * (0.62 + 0.30 * l + 0.08 * side);
+        fragColor = vec4(c, 1.0);
+        return;
+    }
+
     vec3  L   = normalize(-uSunDir);
     vec3  H   = normalize(L + V);
     float NdL = max(dot(N, L), 0.0);
@@ -195,6 +208,13 @@ uniform mat4 uLightVP;
 void main() { gl_Position = uLightVP * uModel * vec4(aPosition, 1.0); }
 )";
         const char* kDepthFrag = "#version 460 core\nvoid main() {}\n";
+
+        const char* kLineFrag = R"(
+#version 460 core
+out vec4 fragColor;
+uniform vec3 uColor;
+void main() { fragColor = vec4(uColor, 1.0); }
+)";
 
         const char* kSkyVert = R"(
 #version 460 core
@@ -284,6 +304,8 @@ void main() {
         if (meshProgram_)  glDeleteProgram(meshProgram_);
         if (depthProgram_) glDeleteProgram(depthProgram_);
         if (skyProgram_)   glDeleteProgram(skyProgram_);
+        if (lineProgram_)  glDeleteProgram(lineProgram_);
+        for (auto& [mesh, e] : edges_) { glDeleteVertexArrays(1, &e.vao); glDeleteBuffers(1, &e.ibo); }
         if (shadowFbo_)    glDeleteFramebuffers(1, &shadowFbo_);
         if (shadowTex_)    glDeleteTextures(1, &shadowTex_);
         if (skyVao_)       glDeleteVertexArrays(1, &skyVao_);
@@ -294,7 +316,8 @@ void main() {
         meshProgram_  = Link(kMeshVert, kMeshFrag);
         depthProgram_ = Link(kDepthVert, kDepthFrag);
         skyProgram_   = Link(kSkyVert, kSkyFrag);
-        if (!meshProgram_ || !depthProgram_ || !skyProgram_) return false;
+        lineProgram_  = Link(kDepthVert, kLineFrag);
+        if (!meshProgram_ || !depthProgram_ || !skyProgram_ || !lineProgram_) return false;
 
         glGenVertexArrays(1, &skyVao_);
         glGenTextures(1, &shadowTex_);
@@ -324,10 +347,89 @@ void main() {
     }
 
     void RealisticPass::ForgetMesh(const GPUMesh* mesh) {
+        auto e = edges_.find(mesh);
+        if (e != edges_.end()) {
+            glDeleteVertexArrays(1, &e->second.vao);
+            glDeleteBuffers(1, &e->second.ibo);
+            edges_.erase(e);
+        }
         auto it = vaos_.find(mesh);
         if (it == vaos_.end()) return;
         glDeleteVertexArrays(1, &it->second);
         vaos_.erase(it);
+    }
+
+    // Feature edges: mesh edges on the outline (one triangle) or on a crease
+    // (two triangles whose faces meet at more than about 20 degrees). The
+    // diagonals inside flat quads are therefore not drawn, as in a CAD view.
+    const RealisticPass::EdgeGL& RealisticPass::EdgesFor(const GPUMesh* mesh) {
+        auto it = edges_.find(mesh);
+        if (it != edges_.end()) return it->second;
+        EdgeGL out;
+
+        GLuint vbo = static_cast<GLBuffer*>(mesh->vertexBuffer)->GetGLID();
+        GLuint ibo = static_cast<GLBuffer*>(mesh->indexBuffer)->GetGLID();
+        std::vector<f32> v(static_cast<size_t>(mesh->vertexCount) * 11);
+        std::vector<u32> idx(mesh->indexCount);
+        if (!v.empty() && !idx.empty()) {
+            glGetNamedBufferSubData(vbo, 0, static_cast<GLsizeiptr>(v.size() * sizeof(f32)), v.data());
+            glGetNamedBufferSubData(ibo, 0, static_cast<GLsizeiptr>(idx.size() * sizeof(u32)), idx.data());
+
+            // Weld vertices by position so faces that share an edge are found.
+            std::map<std::tuple<int, int, int>, u32> weld;
+            std::vector<u32> wid(mesh->vertexCount);
+            for (u32 i = 0; i < mesh->vertexCount; i++) {
+                auto key = std::make_tuple(static_cast<int>(std::lround(v[i * 11] * 2000.0f)),
+                                           static_cast<int>(std::lround(v[i * 11 + 1] * 2000.0f)),
+                                           static_cast<int>(std::lround(v[i * 11 + 2] * 2000.0f)));
+                wid[i] = weld.emplace(key, static_cast<u32>(weld.size())).first->second;
+            }
+            struct Edge { u32 a, b; Vec3 n; int faces; bool crease; };
+            std::map<std::pair<u32, u32>, Edge> table;
+            for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+                u32 i[3] = { idx[t], idx[t + 1], idx[t + 2] };
+                if (i[0] >= mesh->vertexCount || i[1] >= mesh->vertexCount || i[2] >= mesh->vertexCount) continue;
+                Vec3 p[3];
+                for (int k = 0; k < 3; k++) p[k] = { v[i[k] * 11], v[i[k] * 11 + 1], v[i[k] * 11 + 2] };
+                Vec3 e1 = { p[1].x - p[0].x, p[1].y - p[0].y, p[1].z - p[0].z };
+                Vec3 e2 = { p[2].x - p[0].x, p[2].y - p[0].y, p[2].z - p[0].z };
+                Vec3 n  = Math::Cross(e1, e2);
+                if (n.x * n.x + n.y * n.y + n.z * n.z < 1e-14f) continue;      // degenerate
+                n = Math::Normalize(n);
+                for (int k = 0; k < 3; k++) {
+                    u32 a = i[k], b = i[(k + 1) % 3];
+                    u32 wa = wid[a], wb = wid[b];
+                    if (wa == wb) continue;
+                    auto key = wa < wb ? std::make_pair(wa, wb) : std::make_pair(wb, wa);
+                    auto f = table.find(key);
+                    if (f == table.end()) {
+                        table[key] = { a, b, n, 1, false };
+                    } else {
+                        if (Math::Dot(f->second.n, n) < 0.94f) f->second.crease = true;
+                        f->second.faces++;
+                    }
+                }
+            }
+            std::vector<u32> lines;
+            for (auto& [key, e] : table) {
+                if (e.faces == 1 || e.crease) { lines.push_back(e.a); lines.push_back(e.b); }
+            }
+            if (!lines.empty()) {
+                glGenVertexArrays(1, &out.vao);
+                glBindVertexArray(out.vao);
+                glBindBuffer(GL_ARRAY_BUFFER, vbo);
+                glGenBuffers(1, &out.ibo);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, out.ibo);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(lines.size() * sizeof(u32)),
+                             lines.data(), GL_STATIC_DRAW);
+                glEnableVertexAttribArray(0);
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(f32), nullptr);
+                glBindVertexArray(0);
+                out.count = static_cast<int>(lines.size());
+            }
+        }
+        edges_[mesh] = out;
+        return edges_[mesh];
     }
 
     unsigned int RealisticPass::VaoFor(const GPUMesh* mesh) {
@@ -395,7 +497,9 @@ void main() {
         glDisable(GL_BLEND);
 
         // ---- pass 1: shadow depth ----
-        if (shadows_) {
+        const bool cad = style_ != 0;
+        const bool useShadows = shadows_ && !cad;
+        if (useShadows) {
             glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo_);
             glViewport(0, 0, kShadowSize, kShadowSize);
             glClear(GL_DEPTH_BUFFER_BIT);
@@ -416,12 +520,15 @@ void main() {
         // ---- pass 2: sky, opaque, then glass ----
         glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(targetFbo));
         glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
-        glClearColor(0, 0, 0, 1);
+        if (style_ == 2)      glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        else if (cad)         glClearColor(0.88f, 0.90f, 0.93f, 1.0f);
+        else                  glClearColor(0.72f, 0.82f, 0.94f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const Vec3 sky = { 0.20f, 0.42f, 0.86f }, horizon = { 0.72f, 0.82f, 0.94f }, ground = { 0.26f, 0.25f, 0.23f };
         const Mat4& proj = camera.GetProjectionMatrix();
 
+        const bool drawSky = !cad && !camera.IsOrthographic();
         glDepthMask(GL_FALSE);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
@@ -438,7 +545,7 @@ void main() {
         U3(skyProgram_, "uGroundColor", ground);
         U1(skyProgram_, "uExposure", exposure_);
         glBindVertexArray(skyVao_);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        if (drawSky) glDrawArrays(GL_TRIANGLES, 0, 3);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glDepthMask(GL_TRUE);
@@ -454,7 +561,8 @@ void main() {
         U3(p, "uHorizonColor", horizon);
         U3(p, "uGroundColor", ground);
         U1(p, "uExposure", exposure_);
-        UI(p, "uShadows", shadows_ ? 1 : 0);
+        UI(p, "uShadows", useShadows ? 1 : 0);
+        UI(p, "uStyle", style_);
         UI(p, "uAlbedoTex", 0);
         UI(p, "uNormalTex", 1);
         UI(p, "uRoughTex", 2);
@@ -468,8 +576,8 @@ void main() {
             U3(p, "uAlbedo", m.albedo);
             U1(p, "uMetallic", m.metallic);
             U1(p, "uRoughness", m.roughness);
-            U1(p, "uOpacity", m.opacity);
-            U1(p, "uTexScale", m.texScale);
+            U1(p, "uOpacity", cad ? 1.0f : m.opacity);
+            U1(p, "uTexScale", cad ? 0.0f : m.texScale);
             const Texture2D* tex[3] = { m.albedoTex, m.normalTex, m.roughTex };
             const char* has[3] = { "uHasAlbedo", "uHasNormal", "uHasRough" };
             for (int i = 0; i < 3; i++) {
@@ -487,10 +595,30 @@ void main() {
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         std::vector<const DrawCall*> glass;
+        if (cad) {                                  // push faces back so the edge lines win
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(1.0f, 1.0f);
+        }
         for (auto& dc : draws) {
             if (!dc.mesh || !dc.mesh->indexBuffer) continue;
-            if (dc.material.opacity < 0.99f) { glass.push_back(&dc); continue; }
+            if (!cad && dc.material.opacity < 0.99f) { glass.push_back(&dc); continue; }
             drawOne(dc);
+        }
+        if (cad) {
+            glDisable(GL_POLYGON_OFFSET_FILL);
+            glUseProgram(lineProgram_);
+            UM(lineProgram_, "uLightVP", camera.GetViewProjection());
+            U3(lineProgram_, "uColor", style_ == 2 ? Vec3{ 0.0f, 0.0f, 0.0f } : Vec3{ 0.10f, 0.11f, 0.13f });
+            glLineWidth(1.0f);
+            for (auto& dc : draws) {
+                if (!dc.mesh || !dc.mesh->indexBuffer) continue;
+                const EdgeGL& e = EdgesFor(dc.mesh);
+                if (!e.count) continue;
+                UM(lineProgram_, "uModel", dc.transform);
+                glBindVertexArray(e.vao);
+                glDrawElements(GL_LINES, e.count, GL_UNSIGNED_INT, nullptr);
+            }
+            glUseProgram(p);
         }
 
         if (!glass.empty()) {

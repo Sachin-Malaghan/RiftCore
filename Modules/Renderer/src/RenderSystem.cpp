@@ -248,6 +248,7 @@ void main() {
     void RenderSystem::EndFrame() {
         if (realistic_ && !wireframe_) {
             if (!realisticPass_) realisticPass_ = new RealisticPass();
+            realisticPass_->SetStyle(style_ - 1);
             realisticPass_->SetShadows(shadows_);
             realisticPass_->SetExposure(exposure_);
             stats_.drawCalls = 0;

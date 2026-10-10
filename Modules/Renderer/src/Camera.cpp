@@ -49,6 +49,12 @@ namespace RiftCore {
         Update();
     }
 
+    void Camera::SetOrthographic(bool enabled, f32 height) {
+        ortho_       = enabled;
+        orthoHeight_ = height < 0.05f ? 0.05f : height;
+        Update();
+    }
+
     void Camera::MoveForward(f32 amount) {
         position_.x += forward_.x * amount;
         position_.y += forward_.y * amount;
@@ -107,8 +113,20 @@ namespace RiftCore {
         };
 
         view_       = Math::LookAt(position_, lookTarget, up_);
-        projection_ = Math::Perspective(
-            fov_, aspect_, nearZ_, farZ_);
+        if (ortho_) {
+            f32 hh = orthoHeight_ * 0.5f, hw = hh * aspect_;
+            // The near plane sits behind the eye so nothing is clipped when
+            // the camera is close to (or inside) the model.
+            f32 n = -farZ_, f = farZ_;
+            Mat4 m = Mat4::Identity();
+            m.cols[0][0] = 1.0f / hw;
+            m.cols[1][1] = 1.0f / hh;
+            m.cols[2][2] = -2.0f / (f - n);
+            m.cols[3][2] = -(f + n) / (f - n);
+            projection_ = m;
+        } else {
+            projection_ = Math::Perspective(fov_, aspect_, nearZ_, farZ_);
+        }
     }
 
 } // namespace RiftCore

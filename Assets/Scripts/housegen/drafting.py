@@ -12,6 +12,7 @@ linework:
 """
 from . import model as M
 from . import vastu as V
+from . import units as U
 
 
 class Sheet:
@@ -55,7 +56,7 @@ class Sheet:
         for x in (x1, x2):
             self.line(x, y - 130, x, y + 130, "DIM")
             self.line(x - 90, y - 90, x + 90, y + 90, "DIM")
-        self.text((x1 + x2) / 2.0, y + 70, label or "%d" % round(abs(x2 - x1)), 170, "DIM", "c")
+        self.text((x1 + x2) / 2.0, y + 70, label or U.fmt_len(abs(x2 - x1)), 170, "DIM", "c")
 
     def dim_v(self, y1, y2, x, label=None):
         if abs(y2 - y1) < 1:
@@ -64,7 +65,7 @@ class Sheet:
         for y in (y1, y2):
             self.line(x - 130, y, x + 130, y, "DIM")
             self.line(x - 90, y - 90, x + 90, y + 90, "DIM")
-        self.text(x - 70, (y1 + y2) / 2.0, label or "%d" % round(abs(y2 - y1)), 170, "DIM", "c", 90)
+        self.text(x - 70, (y1 + y2) / 2.0, label or U.fmt_len(abs(y2 - y1)), 170, "DIM", "c", 90)
 
     def chain_h(self, xs, y):
         xs = sorted(set(xs))
@@ -78,8 +79,8 @@ class Sheet:
 
     def title_block(self, x, y, design, scale="1:100"):
         self.text(x, y, self.title.upper(), 420, "TITLE", "l")
-        self.text(x, y - 420, "%s   |   scale %s   |   all dimensions in millimetres"
-                  % (design.brief.name, scale), 200, "TEXT", "l")
+        self.text(x, y - 420, "%s   |   scale %s   |   %s"
+                  % (design.brief.name, scale, U.note()), 200, "TEXT", "l")
 
     def level(self, x, y, label):
         self.line(x, y, x + 900, y, "DIM")
@@ -88,7 +89,7 @@ class Sheet:
 
 
 def _fmt_level(mm):
-    return "%+.3f" % (mm / 1000.0)
+    return U.fmt_level(mm)
 
 
 def _solid_spans(a, b, openings):
@@ -177,7 +178,7 @@ def floor_plan(d, floor):
         s.poly([(ax - 110, tip - k * 230), (ax, tip), (ax + 110, tip - k * 230)], "STAIR")
         s.text(ax, st.y0 - k * 230 - 80, "DN" if top else "UP", 170, "TEXT")
         s.text(st.x + st.w / 2.0, (st.y + st.d - 420) if k > 0 else (st.y + 250),
-               "%d R x %.0f / T %d" % (st.risers, st.riser_h, st.tread), 130, "TEXT")
+               "%d R x %s / T %s" % (st.risers, U.fmt_len(st.riser_h), U.fmt_len(st.tread)), 130, "TEXT")
 
     # Room labels: name, clear size, clear area.
     for r in d.rooms_on(floor):
@@ -185,12 +186,12 @@ def floor_plan(d, floor):
         if r.kind == "stair":
             continue
         if r.kind == "hall":
-            s.text(cx, cy - 70, "%s  %d wide" % (r.name.upper(), r.clear_d), 170, "TEXT")
+            s.text(cx, cy - 70, "%s  %s wide" % (r.name.upper(), U.fmt_len(r.clear_d)), 170, "TEXT")
             continue
         small = r.w < 2100
         s.text(cx, cy + (150 if small else 260), r.name.upper(), 170 if small else 230, "ROOM")
-        s.text(cx, cy - 110, "%d x %d" % (r.clear_w, r.clear_d), 140 if small else 170, "TEXT")
-        s.text(cx, cy - 400, "%.2f sq.m" % r.area, 140 if small else 170, "TEXT")
+        s.text(cx, cy - 110, U.fmt_size(r.clear_w, r.clear_d), 140 if small else 170, "TEXT")
+        s.text(cx, cy - 400, U.fmt_area(r.area), 140 if small else 170, "TEXT")
 
     # Dimension chains (wall centre lines) and overall sizes.
     rooms = d.rooms_on(floor)
@@ -353,7 +354,7 @@ def section(d):
         for r in d.rooms_on(f):
             if r.x <= cx <= r.x2:
                 s.text(r.y + r.d / 2.0, z + d.H * 0.42, r.name.upper(), 170 if r.kind != "hall" else 120, "ROOM")
-                s.text(r.y + r.d / 2.0, z + d.H * 0.42 - 300, "clear ht %d" % (d.H - M.SLAB_T), 120, "TEXT")
+                s.text(r.y + r.d / 2.0, z + d.H * 0.42 - 300, "clear ht %s" % U.fmt_len(d.H - M.SLAB_T), 120, "TEXT")
 
     roof = d.roof_level
     if d.brief.style == "traditional":
@@ -409,8 +410,10 @@ def structure_plan(d):
     s.dim_h(0, W, -2200)
     s.chain_v(ys, -1700)
     s.dim_v(0, D, -2400)
-    s.text(0, -3000, "Columns %d x %d RCC. Isolated footings %d x %d x 300 at %d below GL. "
-           "Plinth beams 230 x 300 on all wall lines." % (M.COLUMN, M.COLUMN, f, f, M.FOOTING_DEPTH), 170, "TEXT", "l")
+    s.text(0, -3000, "Columns %s RCC. Isolated footings %s x %s at %s below GL. "
+           "Plinth beams %s on all wall lines." % (U.fmt_size(M.COLUMN, M.COLUMN), U.fmt_size(f, f),
+                                                   U.fmt_len(300), U.fmt_len(M.FOOTING_DEPTH),
+                                                   U.fmt_size(230, 300)), 170, "TEXT", "l")
     s.text(0, -3350, "Sizes are indicative for a preliminary scheme - to be confirmed by a structural engineer.",
            170, "TEXT", "l")
     s.title_block(0, -4100, d)
@@ -429,7 +432,7 @@ def site_plan(d):
     s.line(0, 0, d.W, d.D, "ROOFHATCH")
     s.line(0, d.D, d.W, 0, "ROOFHATCH")
     s.text(d.W / 2.0, d.D / 2.0 + 250, "PROPOSED HOUSE", 300, "ROOM")
-    s.text(d.W / 2.0, d.D / 2.0 - 250, "%d x %d  (G%s)" % (d.W, d.D, "+%d" % (d.floors - 1) if d.floors > 1 else ""),
+    s.text(d.W / 2.0, d.D / 2.0 - 250, "%s  (G%s)" % (U.fmt_size(d.W, d.D), "+%d" % (d.floors - 1) if d.floors > 1 else ""),
            220, "TEXT")
     s.rect(px - 1000, py - 4500, b.plot_w + 2000, 3500, "GROUND")
     s.text(px + b.plot_w / 2.0, py - 2900, "ROAD", 400, "TEXT")
@@ -440,13 +443,14 @@ def site_plan(d):
     s.dim_h(px, 0, d.D / 2.0)
     s.dim_h(d.W, px + b.plot_w, d.D / 2.0)
     cover = 100.0 * d.W * d.D / float(b.plot_w * b.plot_d)
-    s.text(px, py - 5300, "Plot %.1f sq.m   |   ground coverage %.1f %%   |   built-up %.1f sq.m"
-           % (b.plot_w * b.plot_d / 1e6, cover, d.W * d.D * d.floors / 1e6), 220, "TEXT", "l")
+    s.text(px, py - 5300, "Plot %s   |   ground coverage %.1f %%   |   built-up %s"
+           % (U.fmt_area(b.plot_w * b.plot_d / 1e6), cover, U.fmt_area(d.W * d.D * d.floors / 1e6)), 220, "TEXT", "l")
     s.title_block(px, py - 6300, d, "1:200")
     return s
 
 
 def all_sheets(d):
+    U.set_units(d.brief.units)
     sheets = [floor_plan(d, f) for f in range(d.floors)]
     sheets += [elevation(d, face) for face in ("front", "rear", "left", "right")]
     sheets += [section(d), structure_plan(d), site_plan(d)]

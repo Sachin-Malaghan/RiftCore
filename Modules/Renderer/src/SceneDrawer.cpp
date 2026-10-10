@@ -115,7 +115,7 @@ namespace RiftCore {
             dc.material.albedo    = it.desc.mesh.albedo;
             dc.material.metallic  = it.desc.mesh.metallic;
             dc.material.roughness = it.desc.mesh.roughness;
-            if (renderer_->IsRealistic() && !it.desc.mesh.materialName.empty()) {
+            if (renderer_->UsesMaterials() && !it.desc.mesh.materialName.empty()) {
                 if (!materials_) materials_ = new MaterialLibrary(renderer_->GetTextureLoader());
                 if (const MaterialDef* def = materials_->Get(it.desc.mesh.materialName)) {
                     dc.material.albedoTex = def->albedo;

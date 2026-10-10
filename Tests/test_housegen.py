@@ -95,4 +95,18 @@ for i, prompt in enumerate(PROMPTS):
         assert rc.find(part), "%s 3D model has no %s" % (tag, part)
     assert rc.node_count() > 200, "%s only %d nodes" % (tag, rc.node_count())
 
+# Unit systems: the same model, written in each system.
+from housegen import units as U
+assert [U.fmt_len(3600, u) for u in U.SYSTEMS] == ["3600", "360.0", "3.600", '141 3/4"', "11'-9 3/4\""]
+assert U.fmt_len(9144, "ft-in") == "30'-0\"" and U.fmt_area(10.0, "ft-in") == "107.6 sq.ft"
+assert housegen.parse_prompt("3 bedroom house on a 30 x 40 ft plot").units == "ft-in"
+assert housegen.parse_prompt("2 bedroom house, dimensions in cm").units == "cm"
+for units in U.SYSTEMS:
+    out = os.path.join(out_root, "units_" + units.replace("-", "_"))
+    res = housegen.generate("2 bedroom house", out_dir=out, build_scene=False, units=units)
+    assert res["design"].brief.units == units
+    report = open(os.path.join(out, "report.md"), encoding="utf-8").read()
+    assert U.NAMES[units] in report, units
+    assert ("sq.ft" in report) == U.is_imperial(units), units
+
 print("HOUSEGEN PASSED: %d designs" % len(PROMPTS))

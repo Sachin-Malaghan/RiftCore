@@ -179,9 +179,12 @@ namespace RiftCore {
             else if (a == "--show")   showTabs_ = std::string(",") + argv[++i] + ",";
         }
         bool argPlay = false;
+        int  argStdView = -1;
         for (int i = 1; i < argc; i++) {
             if (std::string(argv[i]) == "--play") argPlay = true;
-            if (std::string(argv[i]) == "--realistic") realistic_ = true;
+            if (std::string(argv[i]) == "--realistic") visualStyle_ = 1;
+            if (std::string(argv[i]) == "--style" && i + 1 < argc) visualStyle_ = std::atoi(argv[i + 1]);
+            if (std::string(argv[i]) == "--std-view" && i + 1 < argc) argStdView = std::atoi(argv[i + 1]);
         }
 
         EngineConfig config;
@@ -270,6 +273,7 @@ namespace RiftCore {
         undo_.clear();
         dirty_ = false;
         UpdateTitle();
+        if (argStdView >= 0) SetStandardView(argStdView);
         if (argPlay) Play();
         return true;
     }
@@ -361,7 +365,8 @@ namespace RiftCore {
         camera_.SetAspectRatio(static_cast<float>(targetW_) / static_cast<float>(targetH_));
         renderer_->SetClearColor(skyColor_);
         renderer_->SetWireframe(wireframe_);
-        renderer_->SetRealistic(realistic_);
+        renderer_->SetVisualStyle(visualStyle_);
+        camera_.SetOrthographic(ortho_, orthoHeight_);
         renderer_->SetShadows(shadows_);
         renderer_->SetExposure(exposure_);
         renderer_->BeginFrame(camera_);
@@ -857,8 +862,17 @@ namespace RiftCore {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
-            if (ImGui::MenuItem(L(Icon::Shapes, "Solid rendering"), nullptr, !realistic_)) realistic_ = false;
-            if (ImGui::MenuItem(L(Icon::Sun, "Realistic rendering"), nullptr, realistic_)) realistic_ = true;
+            if (ImGui::MenuItem(L(Icon::Shapes, "Solid"), nullptr, visualStyle_ == 0)) visualStyle_ = 0;
+            if (ImGui::MenuItem(L(Icon::Sun, "Realistic"), nullptr, visualStyle_ == 1)) visualStyle_ = 1;
+            if (ImGui::MenuItem(L(Icon::Model, "Shaded with edges"), nullptr, visualStyle_ == 2)) visualStyle_ = 2;
+            if (ImGui::MenuItem(L(Icon::Wireframe, "Hidden line"), nullptr, visualStyle_ == 3)) visualStyle_ = 3;
+            ImGui::Separator();
+            ImGui::MenuItem(L(Icon::Viewport, "Parallel projection"), nullptr, &ortho_);
+            if (ImGui::BeginMenu(L(Icon::Camera, "Standard views"))) {
+                static const char* names[] = { "Top", "Front", "Right", "Left", "Back", "Isometric" };
+                for (int i = 0; i < 6; i++) if (ImGui::MenuItem(names[i])) SetStandardView(i);
+                ImGui::EndMenu();
+            }
             ImGui::Separator();
             ImGui::MenuItem(L(Icon::Wireframe, "Wireframe"), nullptr, &wireframe_);
             ImGui::MenuItem(L(Icon::Grid, "Selection Bounds"), nullptr, &showBounds_);
@@ -901,9 +915,9 @@ namespace RiftCore {
         }
         if (ToolButton(Icon::Snap, "Snap", "Snap to grid while dragging", snap_)) snap_ = !snap_;
         if (ToolButton(Icon::Wireframe, "Wire", "Wireframe view", wireframe_)) wireframe_ = !wireframe_;
-        if (ToolButton(Icon::Sun, "Real", realistic_ ? "Render mode: Realistic (click for Solid)"
-                                                     : "Render mode: Solid (click for Realistic)", realistic_)) {
-            realistic_ = !realistic_;
+        if (ToolButton(Icon::Sun, "Real", visualStyle_ == 1 ? "Visual style: Realistic (click for Solid)"
+                                                            : "Switch to the Realistic visual style", visualStyle_ == 1)) {
+            visualStyle_ = visualStyle_ == 1 ? 0 : 1;
         }
         if (ToolButton(Icon::Focus, "Focus", "Focus the selection (F)")) FocusSelection();
         ToolSeparator();
@@ -1024,42 +1038,100 @@ namespace RiftCore {
         if (showBounds_) DrawSelectionBox(pos.x, pos.y, avail.x, avail.y);
         DrawGizmo(pos.x, pos.y, avail.x, avail.y);
 
+        // ---- view bar: visual style, projection, standard views ----
+        static const char* styles[] = { "Solid", "Realistic", "Shaded", "Hidden Line" };
+        static const char* views[]  = { "Top", "Front", "Right", "Left", "Back", "Iso" };
+        bool overUi = false;
+        const ImVec4 idle(0.10f, 0.11f, 0.13f, 0.88f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7, 3));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+        ImGui::SetCursorScreenPos(ImVec2(pos.x + 10, pos.y + 8));
+        for (int i = 0; i < 4; i++) {
+            if (i > 0) ImGui::SameLine(0, 3);
+            ImGui::PushStyleColor(ImGuiCol_Button, i == visualStyle_ ? Col::Accent : idle);
+            if (ImGui::Button(styles[i])) visualStyle_ = i;
+            ImGui::PopStyleColor();
+            overUi |= ImGui::IsItemHovered();
+        }
+        ImGui::SameLine(0, 14);
+        ImGui::PushStyleColor(ImGuiCol_Button, ortho_ ? Col::Accent : idle);
+        if (ImGui::Button(ortho_ ? "Parallel" : "Perspective")) {
+            ortho_ = !ortho_;
+            Vec3 c = OrbitPivot(), p = camera_.GetPosition();
+            float dist = std::sqrt((p.x-c.x)*(p.x-c.x) + (p.y-c.y)*(p.y-c.y) + (p.z-c.z)*(p.z-c.z));
+            if (ortho_) orthoHeight_ = std::max(2.0f, dist * 2.0f * std::tan(camFov_ * 0.5f * 3.14159265f / 180.0f));
+        }
+        ImGui::PopStyleColor();
+        overUi |= ImGui::IsItemHovered();
+        Tooltip("Perspective / parallel (orthographic) projection");
+        ImGui::PushStyleColor(ImGuiCol_Button, idle);
+        for (int i = 0; i < 6; i++) {
+            ImGui::SameLine(0, i == 0 ? 14.0f : 3.0f);
+            if (ImGui::Button(views[i])) SetStandardView(i);
+            overUi |= ImGui::IsItemHovered();
+        }
+        ImGui::PopStyleColor();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+
         ImGuiIO& io = ImGui::GetIO();
-        if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        if (hovered && !overUi && !io.KeyAlt && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
             !ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !flying_) {
             float nx = ((io.MousePos.x - pos.x) / avail.x) * 2.0f - 1.0f;
             float ny = 1.0f - ((io.MousePos.y - pos.y) / avail.y) * 2.0f;
             PickAt(nx, ny);
         }
-        UpdateCamera(hovered, io.DeltaTime);
+        UpdateCamera(hovered && !overUi, io.DeltaTime);
 
-        // Overlay: view hints (top-left) and play badge (top-right).
+        // Hints and play frame. Light backgrounds (hidden line, shaded) need dark text.
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        Vec3 cp = camera_.GetPosition();
-        char buf[160];
-        std::snprintf(buf, sizeof(buf), "Perspective   (%.1f, %.1f, %.1f)", cp.x, cp.y, cp.z);
-        dl->AddText(ImVec2(pos.x + 12, pos.y + 8), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.75f)), buf);
-        dl->AddText(ImVec2(pos.x + 12, pos.y + avail.y - 26),
-                    ImGui::GetColorU32(ImVec4(1, 1, 1, 0.45f)),
-                    "RMB + WASD fly    Wheel dolly    LMB select    Q W E R tools    F focus");
+        bool light = visualStyle_ >= 2;
+        ImU32 hint = ImGui::GetColorU32(light ? ImVec4(0, 0, 0, 0.55f) : ImVec4(1, 1, 1, 0.50f));
+        dl->AddText(ImVec2(pos.x + 12, pos.y + avail.y - 26), hint,
+                    "MMB / Alt+LMB orbit    Shift+MMB pan    Wheel zoom    RMB + WASD fly    LMB select    F focus");
         if (playState_ != PlayState::Edit) {
             ImU32 c = ImGui::GetColorU32(playState_ == PlayState::Playing ? Col::Green : Col::Yellow);
             dl->AddRect(pos, ImVec2(pos.x + avail.x, pos.y + avail.y), c, 6.0f, 0, 2.0f);
         }
     }
 
+    // Centre the camera orbits about: the selection, else the generated
+    // house, else the last pivot.
+    Vec3 EditorApp::OrbitPivot() {
+        if (ISceneNode* n = scene_->GetNode(selected_)) return n->GetWorldPosition();
+        if (!houseSheets_.empty()) return { 0.0f, houseTop_ / 2000.0f, 0.0f };
+        return pivot_;
+    }
+
+    // Standard CAD views. All but the isometric switch to parallel projection.
+    void EditorApp::SetStandardView(int view) {
+        Vec3 c = OrbitPivot();
+        float r = !houseSheets_.empty()
+            ? std::max({ houseW_, houseD_, houseTop_ }) / 1000.0f * 1.2f + 5.0f : 18.0f;
+        static const Vec3 dirs[6] = { { 0, 1, 0.002f }, { 0, 0, 1 }, { 1, 0, 0 }, { -1, 0, 0 }, { 0, 0, -1 },
+                                      { 0.62f, 0.50f, 0.62f } };
+        Vec3 d = Math::Normalize(dirs[view < 0 || view > 5 ? 5 : view]);
+        camera_.SetPosition({ c.x + d.x * r, c.y + d.y * r, c.z + d.z * r });
+        camera_.SetTarget(c);
+        pivot_       = c;
+        orthoHeight_ = r * 1.05f;
+        ortho_       = (view != 5) || ortho_;
+    }
+
     void EditorApp::UpdateCamera(bool hovered, float dt) {
         ImGuiIO& io = ImGui::GetIO();
+        bool middle = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+        bool altLmb = io.KeyAlt && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+
+        // ---- fly (right mouse) ----
         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
             flying_ = true;
             ImGui::SetWindowFocus();
         }
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) flying_ = false;
-
         if (flying_) {
-            float dyaw = io.MouseDelta.x * 0.15f, dpitch = -io.MouseDelta.y * 0.15f;
-            camera_.RotateYaw(dyaw);
-            camera_.RotatePitch(dpitch);
+            camera_.RotateYaw(io.MouseDelta.x * 0.15f);
+            camera_.RotatePitch(-io.MouseDelta.y * 0.15f);
             float speed = camSpeed_ * (io.KeyShift ? 3.0f : 1.0f) * dt;
             if (ImGui::IsKeyDown(ImGuiKey_W)) camera_.MoveForward( speed);
             if (ImGui::IsKeyDown(ImGuiKey_S)) camera_.MoveForward(-speed);
@@ -1068,8 +1140,45 @@ namespace RiftCore {
             if (ImGui::IsKeyDown(ImGuiKey_E)) camera_.MoveUp( speed);
             if (ImGui::IsKeyDown(ImGuiKey_Q)) camera_.MoveUp(-speed);
         }
+
+        // ---- orbit / pan (middle mouse, or Alt + left) ----
+        bool startDrag = hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Middle) ||
+                                     (io.KeyAlt && ImGui::IsMouseClicked(ImGuiMouseButton_Left)));
+        if (startDrag) {
+            panning_  = io.KeyShift && middle;
+            orbiting_ = !panning_;
+            Vec3 p = camera_.GetPosition(), f = camera_.GetForward();
+            bool anchored = scene_->GetNode(selected_) || !houseSheets_.empty();
+            pivot_ = anchored ? OrbitPivot() : Vec3{ p.x + f.x * 15.0f, p.y + f.y * 15.0f, p.z + f.z * 15.0f };
+        }
+        if (!middle && !altLmb) orbiting_ = panning_ = false;
+
+        Vec3 p = camera_.GetPosition();
+        Vec3 o = { p.x - pivot_.x, p.y - pivot_.y, p.z - pivot_.z };
+        float dist = std::max(0.2f, std::sqrt(o.x * o.x + o.y * o.y + o.z * o.z));
+        if (orbiting_ && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)) {
+            float yaw   = std::atan2(o.z, o.x) + io.MouseDelta.x * 0.008f;
+            float pitch = std::asin(std::clamp(o.y / dist, -1.0f, 1.0f)) + io.MouseDelta.y * 0.008f;
+            pitch = std::clamp(pitch, -1.553f, 1.553f);
+            camera_.SetPosition({ pivot_.x + dist * std::cos(pitch) * std::cos(yaw),
+                                  pivot_.y + dist * std::sin(pitch),
+                                  pivot_.z + dist * std::cos(pitch) * std::sin(yaw) });
+            camera_.SetTarget(pivot_);
+        }
+        if (panning_) {
+            float k = ortho_ ? orthoHeight_ / static_cast<float>(std::max(targetH_, 1)) : dist * 0.0016f;
+            Vec3 r = camera_.GetRight(), u = camera_.GetUp();
+            Vec3 m = { (-r.x * io.MouseDelta.x + u.x * io.MouseDelta.y) * k,
+                       (-r.y * io.MouseDelta.x + u.y * io.MouseDelta.y) * k,
+                       (-r.z * io.MouseDelta.x + u.z * io.MouseDelta.y) * k };
+            camera_.SetPosition({ p.x + m.x, p.y + m.y, p.z + m.z });
+            pivot_ = { pivot_.x + m.x, pivot_.y + m.y, pivot_.z + m.z };
+        }
+
+        // ---- zoom ----
         if (hovered && io.MouseWheel != 0.0f) {
-            camera_.MoveForward(io.MouseWheel * camSpeed_ * 0.15f);
+            if (ortho_) orthoHeight_ = std::clamp(orthoHeight_ * (io.MouseWheel > 0 ? 0.88f : 1.0f / 0.88f), 0.5f, 2000.0f);
+            else        camera_.MoveForward(io.MouseWheel * std::max(camSpeed_ * 0.15f, dist * 0.08f));
         }
     }
 
@@ -1092,6 +1201,13 @@ namespace RiftCore {
             f.y + r.y * ndcX * tanHalf * aspect + u.y * ndcY * tanHalf,
             f.z + r.z * ndcX * tanHalf * aspect + u.z * ndcY * tanHalf });
         Vec3 origin = camera_.GetPosition();
+        if (ortho_) {                       // parallel rays from a plane through the eye
+            float hh = orthoHeight_ * 0.5f, hw = hh * aspect;
+            dir = f;
+            origin = { origin.x + r.x * ndcX * hw + u.x * ndcY * hh - f.x * 500.0f,
+                       origin.y + r.y * ndcX * hw + u.y * ndcY * hh - f.y * 500.0f,
+                       origin.z + r.z * ndcX * hw + u.z * ndcY * hh - f.z * 500.0f };
+        }
 
         SceneNodeID best = INVALID_NODE;
         float bestT = 1e30f;
@@ -1166,7 +1282,7 @@ namespace RiftCore {
         std::memcpy(view, camera_.GetViewMatrix().DataPtr(), sizeof(view));
         std::memcpy(proj, camera_.GetProjectionMatrix().DataPtr(), sizeof(proj));
 
-        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetOrthographic(ortho_);
         ImGuizmo::SetDrawlist();
         ImGuizmo::SetRect(x, y, w, h);
 
@@ -1540,11 +1656,12 @@ namespace RiftCore {
     void EditorApp::DrawWorld() {
         ImGui::BeginChild("##WorldScroll", ImVec2(0, 0));
         if (Section(Icon::Viewport, "Rendering")) {
-            int mode = realistic_ ? 1 : 0;
-            static const char* modes[] = { "Solid", "Realistic" };
+            int mode = visualStyle_;
+            static const char* modes[] = { "Solid", "Realistic", "Shaded with edges", "Hidden line" };
             PropertyLabel("Mode");
-            if (ImGui::Combo("##rmode", &mode, modes, 2)) realistic_ = mode == 1;
-            ImGui::BeginDisabled(!realistic_);
+            if (ImGui::Combo("##rmode", &mode, modes, 4)) visualStyle_ = mode;
+            ImGui::Checkbox("Parallel projection", &ortho_);
+            ImGui::BeginDisabled(visualStyle_ != 1);
             ImGui::Checkbox("Sun shadows", &shadows_);
             PropertyLabel("Exposure");
             ImGui::SliderFloat("##expo", &exposure_, 0.3f, 2.5f, "%.2f");

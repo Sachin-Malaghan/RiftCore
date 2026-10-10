@@ -5,6 +5,7 @@ import os
 
 from . import model as M
 from . import vastu as V
+from . import units as U
 
 # layer: (stroke colour, stroke width in mm at 1:1 model scale, fill colour)
 SVG_STYLE = {
@@ -200,19 +201,20 @@ def write_report(d, path):
           "| Storeys | %d |" % d.floors,
           "| Bedrooms / bathrooms | %d / %d |" % (b.bedrooms, b.bathrooms),
           "| Facing | %s%s |" % (b.facing.capitalize(), " (Vastu zoning)" if b.vastu else ""),
-          "| House size (wall centre lines) | %d x %d mm |" % (d.W, d.D),
-          "| Plot | %d x %d mm |" % (b.plot_w, b.plot_d),
-          "| Floor to floor | %d mm (clear height %d) |" % (d.H, d.H - M.SLAB_T),
+          "| Units | %s |" % U.NAMES[U.get_units()],
+          "| House size (wall centre lines) | %s |" % U.fmt_size(d.W, d.D),
+          "| Plot | %s |" % U.fmt_size(b.plot_w, b.plot_d),
+          "| Floor to floor | %s (clear height %s) |" % (U.fmt_len(d.H), U.fmt_len(d.H - M.SLAB_T)),
           "| Roof | %s |" % ("gable, %d deg" % M.ROOF_PITCH_DEG if b.style == "traditional"
-                             else "flat RCC slab with %d parapet" % M.PARAPET),
-          "| Top of building | %+.3f m |" % (d.top_level / 1000.0), ""]
+                             else "flat RCC slab with %s parapet" % U.fmt_len(M.PARAPET)),
+          "| Top of building | %s |" % U.fmt_level(d.top_level), ""]
 
-    L += ["## Rooms", "", "| Floor | Room | Clear size (mm) | Area (sq.m) |" +
+    L += ["## Rooms", "", "| Floor | Room | Clear size | Area |" +
           (" Zone |" if b.vastu else ""), "|---|---|---|---|" + ("---|" if b.vastu else "")]
     for r in d.rooms:
         zone = " %s |" % V.zone_of(r.x + r.w / 2.0, r.y + r.d / 2.0, d.W, d.D, b.facing) if b.vastu else ""
-        L.append("| %s | %s | %d x %d | %.2f |%s" % (d.floor_name(r.floor), r.name, r.clear_w, r.clear_d,
-                                                    r.area, zone))
+        L.append("| %s | %s | %s | %s |%s" % (d.floor_name(r.floor), r.name,
+                                              U.fmt_size(r.clear_w, r.clear_d), U.fmt_area(r.area), zone))
     L.append("")
 
     if b.vastu:
@@ -229,23 +231,25 @@ def write_report(d, path):
         key = (o.tag, o.kind, o.width, o.height, o.sill)
         sched[key] = sched.get(key, 0) + 1
     for (tag, kind, w, h, sill), n in sorted(sched.items()):
-        L.append("| %s | %s | %d | %d | %d | %d |" % (tag, kind, w, h, sill, n))
+        L.append("| %s | %s | %s | %s | %s | %d |" % (tag, kind, U.fmt_len(w), U.fmt_len(h), U.fmt_len(sill), n))
     L.append("")
 
     if d.stair:
         st = d.stair
-        L += ["## Staircase", "", "Dog-leg, %d risers of %.1f mm, treads %d mm, flights %d mm wide, "
-              "mid landing at %+.3f m above each floor." % (st.risers, st.riser_h, st.tread, st.flight_w,
-                                                            d.H / 2000.0), ""]
+        L += ["## Staircase", "", "Dog-leg, %d risers of %s, treads %s, flights %s wide, mid landing %s above each floor."
+              % (st.risers, U.fmt_len(st.riser_h), U.fmt_len(st.tread), U.fmt_len(st.flight_w),
+                 U.fmt_len(d.H / 2.0)), ""]
 
     L += ["## Structure (preliminary)", "",
-          "%d RCC columns %d x %d on isolated footings %d x %d x 300, %d mm below ground; plinth beams "
-          "230 x 300 on all wall lines; %d mm RCC slabs; %d mm external and %d mm internal brick walls."
-          % (len(d.columns), M.COLUMN, M.COLUMN, d.footing, d.footing, M.FOOTING_DEPTH, M.SLAB_T,
-             M.EXT_T, M.INT_T), ""]
+          "%d RCC columns %s on isolated footings %s x %s, %s below ground; plinth beams %s on all wall "
+          "lines; %s RCC slabs; %s external and %s internal brick walls."
+          % (len(d.columns), U.fmt_size(M.COLUMN, M.COLUMN), U.fmt_size(d.footing, d.footing), U.fmt_len(300),
+             U.fmt_len(M.FOOTING_DEPTH), U.fmt_size(230, 300), U.fmt_len(M.SLAB_T), U.fmt_len(M.EXT_T),
+             U.fmt_len(M.INT_T)), ""]
 
     L += ["## Preliminary quantities", "", "| Item | Quantity | Unit |", "|---|---|---|"]
     for item, qty, unit in quantities(d):
+        qty, unit = U.fmt_quantity(qty, unit)
         L.append("| %s | %s | %s |" % (item, ("%d" % qty) if unit == "nos" else "%.2f" % qty, unit))
     L.append("")
 
@@ -262,6 +266,9 @@ def write_report(d, path):
 def design_to_dict(d, sheets):
     return {
         "brief": d.brief.to_dict(),
+        "units": U.get_units(),
+        "size_text": U.fmt_size(d.W, d.D),
+        "areas_text": [[q[0], U.fmt_area(q[1])] for q in quantities(d) if q[2] == "sq.m"],
         "W": d.W, "D": d.D, "front_band": d.df, "hall": M.HALL,
         "floor_height": d.H, "plinth": M.PLINTH, "roof_level": d.roof_level, "top_level": d.top_level,
         "rooms": [dict(name=r.name, kind=r.kind, floor=r.floor, x=r.x, y=r.y, w=r.w, d=r.d,
@@ -280,6 +287,7 @@ def design_to_dict(d, sheets):
 
 
 def write_all(d, sheets, out_dir):
+    U.set_units(d.brief.units)
     os.makedirs(out_dir, exist_ok=True)
     for s in sheets:
         write_svg(s, os.path.join(out_dir, s.key + ".svg"))

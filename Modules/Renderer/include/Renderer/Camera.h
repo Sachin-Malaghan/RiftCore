@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #pragma warning(push)
 #pragma warning(disable: 4251 4275)
@@ -237,6 +237,11 @@ namespace RiftCore {
         void SetFOV        (f32 fovDegrees);
         void SetAspectRatio(f32 aspect);
         void SetClipPlanes (f32 nearZ, f32 farZ);
+        // Parallel projection (plans, elevations, CAD views). `height` is
+        // the world height shown in the view, in metres.
+        void SetOrthographic(bool enabled, f32 height = 20.0f);
+        bool IsOrthographic() const { return ortho_; }
+        f32  GetOrthoHeight() const { return orthoHeight_; }
 
         void MoveForward(f32 amount);
         void MoveRight  (f32 amount);
@@ -273,6 +278,8 @@ namespace RiftCore {
         f32  aspect_   =  16.0f / 9.0f;
         f32  nearZ_    =   0.1f;
         f32  farZ_     = 100.0f;
+        bool ortho_       = false;
+        f32  orthoHeight_ = 20.0f;
 
         Mat4 view_       = Mat4::Identity();
         Mat4 projection_ = Mat4::Identity();

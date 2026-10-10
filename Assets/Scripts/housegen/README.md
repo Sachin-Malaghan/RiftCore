@@ -59,6 +59,38 @@ the road), **Dollhouse** (roof and upper floors hidden, looking down into the
 ground floor) and **Inside** (eye level in the living room; fly with the right
 mouse button + W A S D).
 
+## Units
+
+The model is held in millimetres; a unit system decides how every size is
+written on the drawings, in the report and in the editor:
+
+| Units | Example | |
+|---|---|---|
+| `mm` | 3600 | default |
+| `cm` | 360.0 | |
+| `m` | 3.600 | |
+| `in` | 141 3/4" | to the nearest 1/8" |
+| `ft-in` | 11'-9 3/4" | to the nearest 1/8" |
+
+Areas follow (sq.m or sq.ft), as do levels and the quantities in the report
+(cu.ft and lb with imperial units). Choose the units in the House AI tab, in
+the prompt (`dimensions in cm`, `units: metres`, `drawings in inches`,
+`imperial`), or in code: `housegen.generate(prompt, units="ft-in")`. A plot
+given in feet (`30 x 40 ft`) selects feet and inches automatically. The DXF
+geometry itself is always in millimetres.
+
+## 3D view (CAD navigation and visual styles)
+
+The bar at the top of the 3D viewport works like a CAD view control:
+
+* **Visual style** - Solid, Realistic, **Shaded** (plain colours with black
+  edge lines) and **Hidden Line** (white faces, black edges).
+* **Perspective / Parallel** - parallel (orthographic) projection gives true
+  elevations and plans in 3D.
+* **Top, Front, Right, Left, Back, Iso** - standard views of the house.
+* **Navigation** - middle mouse (or Alt + left) orbits about the house or the
+  selection, Shift + middle pans, the wheel zooms, right mouse + W A S D flies.
+
 ## Render modes
 
 The toolbar's sun button (or View menu, or World > Rendering) switches between

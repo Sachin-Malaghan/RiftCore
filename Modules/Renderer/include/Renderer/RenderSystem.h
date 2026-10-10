@@ -57,8 +57,17 @@ namespace RiftCore {
         void SetWireframe(bool enabled);
         // Render mode: Solid (fast, flat colours - the modelling view) or
         // Realistic (PBR materials, textures, sun shadows, sky, tone mapping).
-        void SetRealistic(bool on)  { realistic_ = on; }
+        void SetRealistic(bool on)  { SetVisualStyle(on ? 1 : 0); }
         bool IsRealistic()    const { return realistic_; }
+        // Visual style, as in CAD packages:
+        //   0 Solid            flat colours (fast modelling view)
+        //   1 Realistic        materials, textures, shadows, sky
+        //   2 Shaded + edges   plain colours with black edge lines
+        //   3 Hidden line      white faces with black edge lines
+        void SetVisualStyle(int style) { style_ = style < 0 ? 0 : style > 3 ? 3 : style; realistic_ = style_ != 0; }
+        int  GetVisualStyle() const { return style_; }
+        // True when named materials / textures should be applied.
+        bool UsesMaterials()  const { return style_ == 1; }
         void SetShadows(bool on)    { shadows_ = on; }
         void SetExposure(f32 e)     { exposure_ = e; }
         // Background colour used when the frame is cleared.
@@ -90,6 +99,7 @@ namespace RiftCore {
         bool        wireframe_  = false;
         Vec3        clearColor_ = { 0.08f, 0.08f, 0.12f };
         bool        realistic_  = false;
+        int         style_      = 0;
         bool        shadows_    = true;
         f32         exposure_   = 1.0f;
         RealisticPass* realisticPass_ = nullptr;

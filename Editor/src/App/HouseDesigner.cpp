@@ -96,7 +96,9 @@ namespace RiftCore {
             f << housePrompt_;
         }
         Log(LogLevel::Info, "House AI: designing \"" + housePrompt_ + "\"");
-        RunCode("import housegen\nhousegen.generate_from_file('Output/prompt.txt')\n");
+        static const char* unitArg[] = { "None", "'mm'", "'cm'", "'m'", "'in'", "'ft-in'" };
+        RunCode(std::string("import housegen\nhousegen.generate_from_file('Output/prompt.txt', units=") +
+                unitArg[std::clamp(houseUnits_, 0, 5)] + ")\n");
 
         scenePath_.clear();
         selected_ = INVALID_NODE;
@@ -159,22 +161,21 @@ namespace RiftCore {
             }
             const json& b = root["brief"];
             houseInfo_.push_back({ "Project", b.value("name", "House") });
-            houseInfo_.push_back({ "Size", std::to_string(root.value("W", 0)) + " x " +
-                                           std::to_string(root.value("D", 0)) + " mm" });
+            houseInfo_.push_back({ "Size", root.value("size_text", std::string()) });
             houseInfo_.push_back({ "Storeys", std::to_string(b.value("floors", 1)) });
             houseInfo_.push_back({ "Bedrooms / baths", std::to_string(b.value("bedrooms", 0)) + " / " +
                                                        std::to_string(b.value("bathrooms", 0)) });
             houseInfo_.push_back({ "Facing", b.value("facing", "north") +
                                              std::string(b.value("vastu", false) ? "  (Vastu)" : "") });
             houseInfo_.push_back({ "Roof", b.value("style", "modern") == "traditional" ? "gable" : "flat + parapet" });
-            for (auto& q : root["quantities"]) {
-                if (q.size() >= 3 && q[2].get<std::string>() == "sq.m" && houseInfo_.size() < 9) {
-                    char buf[48];
-                    std::snprintf(buf, sizeof(buf), "%.1f sq.m", q[1].get<double>());
+            houseInfo_.push_back({ "Units", root.value("units", std::string("mm")) });
+            if (root.contains("areas_text")) {
+                for (auto& q : root["areas_text"]) {
+                    if (q.size() < 2 || houseInfo_.size() >= 10) continue;
                     std::string label = q[0].get<std::string>();
                     size_t cut = label.find_first_of("(,");
                     if (cut != std::string::npos) label = label.substr(0, cut);
-                    houseInfo_.push_back({ label, buf });
+                    houseInfo_.push_back({ label, q[1].get<std::string>() });
                 }
             }
             houseVastu_.clear();
@@ -251,6 +252,12 @@ namespace RiftCore {
             "Bedrooms, bathrooms, storeys, plot size, facing, vastu, garage, study, pooja, roof style, area.");
         ImGui::PopTextWrapPos();
         ImGui::InputTextMultiline("##housePrompt", &housePrompt_, ImVec2(-1.0f, 96.0f));
+
+        static const char* unitNames[] = { "From the prompt (default mm)", "Millimetres (mm)", "Centimetres (cm)",
+                                           "Metres (m)", "Inches (in)", "Feet and inches (ft-in)" };
+        PropertyLabel("Units");
+        ImGui::Combo("##houseUnits", &houseUnits_, unitNames, 6);
+        Tooltip("How sizes are written on the drawings and in the report");
 
         ImGui::BeginDisabled(!py || housePrompt_.empty());
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.45f, 0.85f, 1.0f));
