@@ -1,6 +1,12 @@
 ﻿#include <Core/PluginManager.h>
 #include <iostream>
 
+
+
+
+
+
+
 #ifdef RIFTCORE_PLATFORM_WINDOWS
     #include <Windows.h>
 #else
