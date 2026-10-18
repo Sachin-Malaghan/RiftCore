@@ -7,6 +7,15 @@
     #include <dlfcn.h>
 #endif
 
+
+
+
+
+
+
+
+
+
 namespace RiftCore {
 
     PluginManager::PluginManager()  = default;
