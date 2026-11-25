@@ -31,6 +31,9 @@ namespace RiftCore {
         LogLevel logLevel     = LogLevel::Debug;
     };
 
+
+
+
     enum class EngineState : u8 {
         Uninitialized = 0,
         Initializing,
