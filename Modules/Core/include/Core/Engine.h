@@ -30,10 +30,6 @@ namespace RiftCore {
         bool     enableEditor = false;
         LogLevel logLevel     = LogLevel::Debug;
     };
-
-
-
-
     enum class EngineState : u8 {
         Uninitialized = 0,
         Initializing,
